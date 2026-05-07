@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import api from '../lib/api'; // Use your custom backend API setup
 
 const AuthContext = createContext({});
 
@@ -8,35 +8,31 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get the current session on load
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    // Listen for auth changes (login, logout)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    // 1. Look directly in the vault where Login.jsx put the token
+    const token = localStorage.getItem('token');
+    
+    if (token) {
+      // 2. If token exists, we set a basic user object to pass the Route Guard.
+      // Note: If this token is fake or expired, your api.js 401 interceptor 
+      // will instantly catch it on the first backend request and kick them out.
+      setUser({ token }); 
+    } else {
+      setUser(null);
+    }
+    
+    setLoading(false);
   }, []);
 
-  const login = (email, password) => supabase.auth.signInWithPassword({ email, password });
-  
-  const signup = (email, password, name) => 
-    supabase.auth.signUp({ 
-      email, 
-      password, 
-      options: { data: { name } } 
-    });
-    
-  const logout = () => supabase.auth.signOut();
+  // 3. Keep logout functional to wipe the vault
+  const logout = () => {
+    localStorage.removeItem('token');
+    setUser(null);
+    window.location.href = '/login';
+  };
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, loading }}>
-      {!loading && children}
+    <AuthContext.Provider value={{ user, logout, loading }}>
+      {children}
     </AuthContext.Provider>
   );
 };
