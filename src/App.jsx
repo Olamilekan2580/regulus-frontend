@@ -11,6 +11,7 @@ import Proposals from './pages/Proposals';
 import ClientPortal from './pages/ClientPortal';
 import Onboarding from './pages/Onboarding';
 import Billing from './pages/Billing';
+import Profile from './pages/Profile';
 
 export default function App() {
   return (
