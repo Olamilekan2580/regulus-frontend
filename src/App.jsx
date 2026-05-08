@@ -29,6 +29,7 @@ export default function App() {
         <Route path="proposals" element={<Proposals />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/billing" element={<Billing />} />
+        <Route path="/profile" element={<Profile />} />
       </Route>
     </Routes>
   );

@@ -1,14 +1,13 @@
-import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard, Users, FolderKanban, Receipt, FileSignature, LogOut } from 'lucide-react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, Users, FolderKanban, Receipt, FileText, Settings, LogOut } from 'lucide-react';
 
 export default function Layout() {
-  const { logout } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
+  const navigate = useNavigate();
 
-  const handleLogout = async () => {
-    await logout();
+  const handleLogout = () => {
+    // Clear your auth tokens here
+    localStorage.removeItem('token'); 
     navigate('/login');
   };
 
@@ -17,43 +16,73 @@ export default function Layout() {
     { name: 'Clients', path: '/clients', icon: Users },
     { name: 'Projects', path: '/projects', icon: FolderKanban },
     { name: 'Invoices', path: '/invoices', icon: Receipt },
-    { name: 'Proposals', path: '/proposals', icon: FileSignature },
+    { name: 'Proposals', path: '/proposals', icon: FileText },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <aside className="w-64 bg-navy text-white flex flex-col">
-        <div className="p-6">
-          <h1 className="text-2xl font-bold text-accent">Regulus.</h1>
+    <div className="flex h-screen bg-gray-50/50">
+      
+      {/* Premium Dark Sidebar */}
+      <div className="w-64 bg-[#0B1121] text-gray-300 flex flex-col border-r border-gray-800 shadow-2xl z-10">
+        <div className="p-8">
+          <h1 className="text-2xl font-bold text-teal-400 tracking-tight">Regulus.</h1>
         </div>
-        <nav className="flex-1 px-4 space-y-2">
+
+        <nav className="flex-1 px-4 space-y-1.5 mt-2 overflow-y-auto">
           {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
+            // Strict match for dashboard, partial match for others so sub-pages stay highlighted
+            const isActive = item.path === '/' 
+              ? location.pathname === '/' 
+              : location.pathname.startsWith(item.path);
+
             return (
               <Link
                 key={item.name}
                 to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-white/10 text-accent' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 group ${
+                  isActive 
+                    ? 'bg-white/10 text-teal-400' 
+                    : 'hover:bg-white/5 hover:text-white'
+                }`}
               >
-                <Icon size={20} />
-                <span className="font-medium">{item.name}</span>
+                <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} className={`transition-colors ${isActive ? 'text-teal-400' : 'text-gray-500 group-hover:text-gray-300'}`} />
+                {item.name}
               </Link>
             );
           })}
         </nav>
-        <div className="p-4 border-t border-white/10">
-          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
-            <LogOut size={18} />
+
+        {/* Bottom Actions (Settings & Logout) */}
+        <div className="p-4 border-t border-white/5 space-y-1.5 mb-4">
+          <Link
+            to="/profile"
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 group ${
+              location.pathname.startsWith('/profile')
+                ? 'bg-white/10 text-teal-400'
+                : 'hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <Settings size={20} strokeWidth={location.pathname.startsWith('/profile') ? 2.5 : 2} className={`transition-colors ${location.pathname.startsWith('/profile') ? 'text-teal-400' : 'text-gray-500 group-hover:text-gray-300'}`} />
+            Settings
+          </Link>
+          
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 text-left group"
+          >
+            <LogOut size={20} className="text-gray-500 group-hover:text-red-400 transition-colors" />
             Logout
           </button>
         </div>
-      </aside>
-      <main className="flex-1 overflow-auto p-8">
-        <div className="max-w-7xl mx-auto">
+      </div>
+
+      {/* Main Content Render Area */}
+      <div className="flex-1 overflow-auto bg-gray-50">
+        <div className="p-8 max-w-7xl mx-auto">
           <Outlet />
         </div>
-      </main>
+      </div>
+      
     </div>
   );
 }
