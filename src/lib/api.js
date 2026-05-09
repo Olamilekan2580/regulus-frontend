@@ -1,7 +1,6 @@
 import axios from 'axios';
 
 const api = axios.create({
-  // FIX: Removed the extra + '/api' so it doesn't double up
   baseURL: import.meta.env.VITE_API_URL, 
 });
 
@@ -23,9 +22,15 @@ api.interceptors.response.use(
     }
     
     if (error.response && error.response.status === 401) {
+      // Clear the stale data
       localStorage.removeItem('token');
       localStorage.removeItem('current_org_id');
-      window.location.href = '/login';
+      
+      // THE FIX: Only trigger a hard redirect if we aren't already on the login page.
+      // This stops Axios and Supabase from fighting over the browser's location state.
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     
     return Promise.reject(error);
