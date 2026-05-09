@@ -12,6 +12,8 @@ import ClientPortal from './pages/ClientPortal';
 import Onboarding from './pages/Onboarding';
 import Billing from './pages/Billing';
 import Profile from './pages/Profile';
+import Settings from './pages/Settings';
+import JoinOrg from './pages/JoinOrg';
 
 export default function App() {
   return (
@@ -31,6 +33,9 @@ export default function App() {
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/billing" element={<Billing />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/join" element={<JoinOrg />} />
+
       </Route>
     </Routes>
   );

@@ -7,10 +7,12 @@ export default {
   theme: {
     extend: {
       colors: {
-        navy: '#0A0F1E',
-        accent: '#00C896'
+        navy: 'var(--theme-navy, #0A0F1E)', // Uses custom var, falls back to default
+        accent: 'var(--theme-accent, #00C896)' // Uses custom var, falls back to default
       }
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/typography'),
+  ],
 }

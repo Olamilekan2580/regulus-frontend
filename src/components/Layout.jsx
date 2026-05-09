@@ -1,14 +1,64 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, FolderKanban, Receipt, FileText, Settings, LogOut, Menu, X } from 'lucide-react';
+import { 
+  LayoutDashboard, 
+  Users, 
+  FolderKanban, 
+  Receipt, 
+  FileText, 
+  Settings, 
+  LogOut, 
+  Menu, 
+  X, 
+  Building2, 
+  User 
+} from 'lucide-react';
+import api from '../lib/api';
 
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [orgName, setOrgName] = useState('Regulus.');
+
+  // Initialize Organization Context & Dynamic Branding
+  useEffect(() => {
+    const initializeWorkspace = async () => {
+      const storedOrgName = localStorage.getItem('current_org_name');
+      const orgId = localStorage.getItem('current_org_id');
+
+      if (storedOrgName) setOrgName(storedOrgName);
+
+      if (orgId) {
+        try {
+          // Fetch the branding settings for this specific workspace
+          const res = await api.get(`/orgs/${orgId}`);
+          const branding = res.data?.brand_settings;
+
+          if (branding) {
+            // Inject CSS variables to override Tailwind's default navy/accent
+            const root = document.documentElement;
+            if (branding.primary) root.style.setProperty('--theme-navy', branding.primary);
+            if (branding.accent) root.style.setProperty('--theme-accent', branding.accent);
+          }
+        } catch (err) {
+          console.error('Failed to load workspace branding.');
+        }
+      }
+    };
+
+    initializeWorkspace();
+  }, [location.pathname]); // Re-verify if they switch workspaces
 
   const handleLogout = () => {
     localStorage.removeItem('token'); 
+    localStorage.removeItem('current_org_id');
+    localStorage.removeItem('current_org_name');
+    
+    // Clear the injected CSS variables so the login screen resets to default
+    document.documentElement.style.removeProperty('--theme-navy');
+    document.documentElement.style.removeProperty('--theme-accent');
+    
     navigate('/login');
   };
 
@@ -22,7 +72,7 @@ export default function Layout() {
 
   const NavLinks = ({ onClick = () => {} }) => (
     <>
-      <nav className="flex-1 px-4 space-y-1.5 mt-2">
+      <nav className="flex-1 px-4 space-y-1.5 mt-4">
         {navItems.map((item) => {
           const isActive = item.path === '/' 
             ? location.pathname === '/' 
@@ -35,28 +85,43 @@ export default function Layout() {
               onClick={onClick}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 group ${
                 isActive 
-                  ? 'bg-teal-400/10 text-teal-400' 
-                  : 'hover:bg-white/5 hover:text-white'
+                  ? 'bg-accent/10 text-accent shadow-sm' 
+                  : 'text-gray-400 hover:bg-white/5 hover:text-white'
               }`}
             >
-              <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'text-teal-400' : 'text-gray-500 group-hover:text-gray-300'} />
+              <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'text-accent' : 'text-gray-500 group-hover:text-gray-300'} />
               {item.name}
             </Link>
           );
         })}
       </nav>
 
-      <div className="p-4 border-t border-white/5 space-y-1.5 mb-4">
+      <div className="p-4 border-t border-white/5 space-y-1.5 mb-4 mt-auto">
+        {/* PERSONAL PROFILE */}
         <Link
           to="/profile"
           onClick={onClick}
           className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 group ${
-            location.pathname.startsWith('/profile') ? 'bg-teal-400/10 text-teal-400' : 'hover:bg-white/5 hover:text-white'
+            location.pathname.startsWith('/profile') ? 'bg-accent/10 text-accent shadow-sm' : 'text-gray-400 hover:bg-white/5 hover:text-white'
           }`}
         >
-          <Settings size={20} strokeWidth={location.pathname.startsWith('/profile') ? 2.5 : 2} className={location.pathname.startsWith('/profile') ? 'text-teal-400' : 'text-gray-500 group-hover:text-gray-300'} />
-          Settings
+          <User size={20} strokeWidth={location.pathname.startsWith('/profile') ? 2.5 : 2} className={location.pathname.startsWith('/profile') ? 'text-accent' : 'text-gray-500 group-hover:text-gray-300'} />
+          My Profile
         </Link>
+
+        {/* WORKSPACE SETTINGS */}
+        <Link
+          to="/settings"
+          onClick={onClick}
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 group ${
+            location.pathname.startsWith('/settings') ? 'bg-accent/10 text-accent shadow-sm' : 'text-gray-400 hover:bg-white/5 hover:text-white'
+          }`}
+        >
+          <Settings size={20} strokeWidth={location.pathname.startsWith('/settings') ? 2.5 : 2} className={location.pathname.startsWith('/settings') ? 'text-accent' : 'text-gray-500 group-hover:text-gray-300'} />
+          Workspace Settings
+        </Link>
+
+        {/* LOGOUT */}
         <button 
           onClick={() => { handleLogout(); onClick(); }}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 text-left group"
@@ -69,22 +134,33 @@ export default function Layout() {
   );
 
   return (
-    <div className="flex h-screen bg-gray-50/50 overflow-hidden">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
       
-      {/* DESKTOP SIDEBAR (Hidden on Mobile) */}
-      <div className="hidden md:flex w-64 bg-[#0B1121] text-gray-300 flex-col border-r border-gray-800 shadow-2xl z-20">
-        <div className="p-8">
-          <h1 className="text-2xl font-bold text-teal-400 tracking-tight">Regulus.</h1>
+      {/* DESKTOP SIDEBAR */}
+      <div className="hidden md:flex w-64 bg-navy text-gray-300 flex-col border-r border-gray-800 shadow-xl z-20">
+        <div className="p-6 pb-2">
+          <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2 truncate">
+            <div className="min-w-8 w-8 h-8 bg-accent text-navy rounded-lg flex items-center justify-center">
+              <Building2 size={18} strokeWidth={2.5} />
+            </div>
+            <span className="truncate">{orgName}</span>
+          </h1>
+          <p className="text-[10px] uppercase tracking-widest text-gray-500 mt-2 ml-1 font-bold">Workspace</p>
         </div>
         <NavLinks />
       </div>
 
-      {/* MOBILE HEADER (Visible only on Mobile) */}
-      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-[#0B1121] border-b border-gray-800 flex items-center justify-between px-6 z-30">
-        <h1 className="text-xl font-bold text-teal-400">Regulus.</h1>
+      {/* MOBILE HEADER */}
+      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-navy border-b border-gray-800 flex items-center justify-between px-6 z-30 shadow-md">
+        <h1 className="text-xl font-black text-white flex items-center gap-2 truncate max-w-[70%]">
+          <div className="min-w-6 w-6 h-6 bg-accent text-navy rounded-md flex items-center justify-center">
+             <Building2 size={14} strokeWidth={2.5} />
+          </div>
+          <span className="truncate">{orgName}</span>
+        </h1>
         <button 
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="text-gray-400 hover:text-white transition-colors"
+          className="text-gray-400 hover:text-white transition-colors p-2"
         >
           {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
@@ -93,25 +169,30 @@ export default function Layout() {
       {/* MOBILE DRAWER OVERLAY */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+          className="fixed inset-0 bg-navy/80 backdrop-blur-sm z-40 md:hidden animate-in fade-in duration-200"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
       {/* MOBILE DRAWER CONTENT */}
-      <div className={`fixed inset-y-0 left-0 w-72 bg-[#0B1121] text-gray-300 transform transition-transform duration-300 ease-in-out z-50 md:hidden flex flex-col ${
+      <div className={`fixed inset-y-0 left-0 w-72 bg-navy text-gray-300 transform transition-transform duration-300 ease-out z-50 md:hidden flex flex-col shadow-2xl ${
         isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
-        <div className="p-8 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-teal-400">Regulus.</h1>
-          <button onClick={() => setIsMobileMenuOpen(false)} className="text-gray-500"><X size={20} /></button>
+        <div className="p-6 flex justify-between items-center border-b border-white/5">
+          <h1 className="text-xl font-black text-white flex items-center gap-2 truncate pr-4">
+            <div className="min-w-6 w-6 h-6 bg-accent text-navy rounded-md flex items-center justify-center">
+               <Building2 size={14} strokeWidth={2.5} />
+            </div>
+            <span className="truncate">{orgName}</span>
+          </h1>
+          <button onClick={() => setIsMobileMenuOpen(false)} className="text-gray-500 hover:text-white transition-colors p-2"><X size={24} /></button>
         </div>
         <NavLinks onClick={() => setIsMobileMenuOpen(false)} />
       </div>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 overflow-auto bg-gray-50 pt-16 md:pt-0">
-        <div className="p-4 md:p-10 max-w-7xl mx-auto">
+      <main className="flex-1 overflow-auto bg-gray-50 pt-16 md:pt-0 relative">
+        <div className="p-4 md:p-10 max-w-7xl mx-auto min-h-full">
           <Outlet />
         </div>
       </main>
