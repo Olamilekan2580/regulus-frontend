@@ -14,7 +14,7 @@ import {
   User 
 } from 'lucide-react';
 import api from '../lib/api';
-import BillingWall from './components/BillingWall'; // NEW: The Gatekeeper Component
+import BillingWall from './BillingWall'; // NEW: The Gatekeeper Component
 
 export default function Layout() {
   const location = useLocation();
