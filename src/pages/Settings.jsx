@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Palette, Trash2, ShieldAlert, CreditCard } from 'lucide-react';
+import { Users, Palette, Trash2, ShieldAlert, CreditCard, Copy } from 'lucide-react';
 import InviteModal from '../components/InviteModal';
 import api from '../lib/api';
 
@@ -104,11 +104,35 @@ export default function Settings() {
     }
   };
 
+  const copyOrgId = () => {
+    if (!orgId) return;
+    navigator.clipboard.writeText(orgId);
+    alert('Workspace ID copied to clipboard!');
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-12">
-      <div>
-        <h1 className="text-3xl font-black text-navy">Workspace Settings</h1>
-        <p className="text-gray-500 font-medium">Manage your agency access, whitelabeling, and integrations.</p>
+      {/* Settings Header with ID Badge */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-navy">Workspace Settings</h1>
+          <p className="text-gray-500 font-medium mt-1">Manage your agency access, whitelabeling, and integrations.</p>
+        </div>
+        
+        {/* Workspace ID Badge */}
+        <div className="bg-white border border-gray-200 px-4 py-2 rounded-xl flex items-center gap-3 shadow-sm">
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Workspace ID</p>
+            <p className="font-mono text-xs text-navy font-bold">{orgId || 'Loading...'}</p>
+          </div>
+          <button 
+            onClick={copyOrgId}
+            className="p-1.5 bg-gray-50 hover:bg-gray-100 text-gray-500 rounded-md transition-colors"
+            title="Copy ID"
+          >
+            <Copy size={14} />
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-6">
