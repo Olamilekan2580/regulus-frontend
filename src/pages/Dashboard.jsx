@@ -6,7 +6,7 @@ import api from '../lib/api';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  // Added chartData to the initial state
+  
   const [stats, setStats] = useState({ 
     clientCount: 0, 
     projectCount: 0, 
@@ -19,32 +19,25 @@ export default function Dashboard() {
   useEffect(() => {
     const initDashboard = async () => {
       try {
-        // 1. Check if they need onboarding
-        const settingsRes = await api.get('/settings');
-        if (!settingsRes.data?.onboarding_completed) {
-          navigate('/onboarding');
-          return;
-        }
-        
-        // 2. Fetch Dashboard Stats
+        // Fetch Dashboard Stats directly - Onboarding check is handled by ProtectedRoute
         const statsRes = await api.get('/stats');
+        
         setStats({
           clientCount: statsRes.data?.clientCount || 0,
           projectCount: statsRes.data?.projectCount || 0,
           revenue: statsRes.data?.revenue || 0,
           outstanding: statsRes.data?.outstanding || 0,
-          // If backend doesn't send chart data yet, default to empty array
           chartData: statsRes.data?.chartData || []
         });
       } catch (err) {
-        console.error(err);
+        console.error('[Dashboard Error]:', err);
       } finally {
         setLoading(false);
       }
     };
     
     initDashboard();
-  }, [navigate]);
+  }, []); // <-- Empty array ensures this runs exactly once
 
   if (loading) return (
     <div className="flex items-center justify-center p-12 text-gray-400">
@@ -82,7 +75,6 @@ export default function Dashboard() {
       <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
         <h2 className="text-lg font-bold text-navy mb-6">Revenue Overview</h2>
         <div className="h-[300px] w-full">
-          {/* THE REALITY CHECK: If revenue is 0 or chart data is empty, show the empty state */}
           {stats.revenue === 0 || stats.chartData.length === 0 ? (
             <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 rounded-xl border border-dashed border-gray-200">
               <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-3">
