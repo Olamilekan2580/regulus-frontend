@@ -11,26 +11,29 @@ export const AuthProvider = ({ children }) => {
     const verifySession = async () => {
       const token = localStorage.getItem('token');
       
-      // 1. No token? Stop here.
       if (!token) {
         setUser(null);
         setLoading(false);
         return;
       }
 
-      // 2. Token exists? Don't blind-trust it. Verify it.
       try {
-        // We ping your backend. If the token is expired, this throws a 401.
-        // The api.js interceptor will catch it, wipe the vault, and gracefully redirect.
+        // Ping the backend to verify the token
         await api.get('/orgs/me');
         
-        // If we get here, the token is 100% valid.
+        // Token is valid and they have a workspace
         setUser({ token });
       } catch (err) {
-        // Token is dead or backend rejected it. Wipe it out.
-        localStorage.removeItem('token');
-        localStorage.removeItem('current_org_id');
-        setUser(null);
+        // THE FIX: If the error is 404, they just don't have a workspace yet. 
+        // Their token is still perfectly valid! Let them in so ProtectedRoute can send them to /onboarding.
+        if (err.response && err.response.status === 404) {
+          setUser({ token });
+        } else {
+          // It's a real error (like 401 Expired), wipe it.
+          localStorage.removeItem('token');
+          localStorage.removeItem('current_org_id');
+          setUser(null);
+        }
       } finally {
         setLoading(false);
       }
