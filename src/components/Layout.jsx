@@ -14,12 +14,31 @@ import {
   User 
 } from 'lucide-react';
 import api from '../lib/api';
+import BillingWall from './components/BillingWall'; // NEW: The Gatekeeper Component
 
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [orgName, setOrgName] = useState('Regulus.');
+  const [isLocked, setIsLocked] = useState(false); // NEW: Subscription Lock State
+
+  // NEW: The Subscription Gatekeeper Listener
+  useEffect(() => {
+    // Listen for the custom event fired by the api.js interceptor
+    const handleLock = () => setIsLocked(true);
+    window.addEventListener('trigger-billing-wall', handleLock);
+
+    // Check if they just returned from a successful Stripe checkout
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('billing') === 'success') {
+      setIsLocked(false); // Unlock the workspace
+      window.history.replaceState(null, '', window.location.pathname); // Clean up the URL
+    }
+
+    // Cleanup listener on unmount
+    return () => window.removeEventListener('trigger-billing-wall', handleLock);
+  }, []);
 
   // Initialize Organization Context & Dynamic Branding
   useEffect(() => {
@@ -134,69 +153,75 @@ export default function Layout() {
   );
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      
-      {/* DESKTOP SIDEBAR */}
-      <div className="hidden md:flex w-64 bg-navy text-gray-300 flex-col border-r border-gray-800 shadow-xl z-20">
-        <div className="p-6 pb-2">
-          <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2 truncate">
-            <div className="min-w-8 w-8 h-8 bg-accent text-navy rounded-lg flex items-center justify-center">
-              <Building2 size={18} strokeWidth={2.5} />
-            </div>
-            <span className="truncate">{orgName}</span>
-          </h1>
-          <p className="text-[10px] uppercase tracking-widest text-gray-500 mt-2 ml-1 font-bold">Workspace</p>
-        </div>
-        <NavLinks />
-      </div>
+    <>
+      {/* NEW: Render the BillingWall over the entire screen if locked */}
+      {isLocked && <BillingWall />}
 
-      {/* MOBILE HEADER */}
-      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-navy border-b border-gray-800 flex items-center justify-between px-6 z-30 shadow-md">
-        <h1 className="text-xl font-black text-white flex items-center gap-2 truncate max-w-[70%]">
-          <div className="min-w-6 w-6 h-6 bg-accent text-navy rounded-md flex items-center justify-center">
-             <Building2 size={14} strokeWidth={2.5} />
+      {/* NEW: Added conditional blurring and disabling of the UI if locked */}
+      <div className={`flex h-screen bg-gray-50 overflow-hidden ${isLocked ? 'blur-md pointer-events-none select-none' : ''}`}>
+        
+        {/* DESKTOP SIDEBAR */}
+        <div className="hidden md:flex w-64 bg-navy text-gray-300 flex-col border-r border-gray-800 shadow-xl z-20">
+          <div className="p-6 pb-2">
+            <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2 truncate">
+              <div className="min-w-8 w-8 h-8 bg-accent text-navy rounded-lg flex items-center justify-center">
+                <Building2 size={18} strokeWidth={2.5} />
+              </div>
+              <span className="truncate">{orgName}</span>
+            </h1>
+            <p className="text-[10px] uppercase tracking-widest text-gray-500 mt-2 ml-1 font-bold">Workspace</p>
           </div>
-          <span className="truncate">{orgName}</span>
-        </h1>
-        <button 
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="text-gray-400 hover:text-white transition-colors p-2"
-        >
-          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
-      </div>
+          <NavLinks />
+        </div>
 
-      {/* MOBILE DRAWER OVERLAY */}
-      {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-navy/80 backdrop-blur-sm z-40 md:hidden animate-in fade-in duration-200"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
-
-      {/* MOBILE DRAWER CONTENT */}
-      <div className={`fixed inset-y-0 left-0 w-72 bg-navy text-gray-300 transform transition-transform duration-300 ease-out z-50 md:hidden flex flex-col shadow-2xl ${
-        isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-      }`}>
-        <div className="p-6 flex justify-between items-center border-b border-white/5">
-          <h1 className="text-xl font-black text-white flex items-center gap-2 truncate pr-4">
+        {/* MOBILE HEADER */}
+        <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-navy border-b border-gray-800 flex items-center justify-between px-6 z-30 shadow-md">
+          <h1 className="text-xl font-black text-white flex items-center gap-2 truncate max-w-[70%]">
             <div className="min-w-6 w-6 h-6 bg-accent text-navy rounded-md flex items-center justify-center">
                <Building2 size={14} strokeWidth={2.5} />
             </div>
             <span className="truncate">{orgName}</span>
           </h1>
-          <button onClick={() => setIsMobileMenuOpen(false)} className="text-gray-500 hover:text-white transition-colors p-2"><X size={24} /></button>
+          <button 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="text-gray-400 hover:text-white transition-colors p-2"
+          >
+            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
         </div>
-        <NavLinks onClick={() => setIsMobileMenuOpen(false)} />
-      </div>
 
-      {/* MAIN CONTENT AREA */}
-      <main className="flex-1 overflow-auto bg-gray-50 pt-16 md:pt-0 relative">
-        <div className="p-4 md:p-10 max-w-7xl mx-auto min-h-full">
-          <Outlet />
+        {/* MOBILE DRAWER OVERLAY */}
+        {isMobileMenuOpen && (
+          <div 
+            className="fixed inset-0 bg-navy/80 backdrop-blur-sm z-40 md:hidden animate-in fade-in duration-200"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+
+        {/* MOBILE DRAWER CONTENT */}
+        <div className={`fixed inset-y-0 left-0 w-72 bg-navy text-gray-300 transform transition-transform duration-300 ease-out z-50 md:hidden flex flex-col shadow-2xl ${
+          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}>
+          <div className="p-6 flex justify-between items-center border-b border-white/5">
+            <h1 className="text-xl font-black text-white flex items-center gap-2 truncate pr-4">
+              <div className="min-w-6 w-6 h-6 bg-accent text-navy rounded-md flex items-center justify-center">
+                 <Building2 size={14} strokeWidth={2.5} />
+              </div>
+              <span className="truncate">{orgName}</span>
+            </h1>
+            <button onClick={() => setIsMobileMenuOpen(false)} className="text-gray-500 hover:text-white transition-colors p-2"><X size={24} /></button>
+          </div>
+          <NavLinks onClick={() => setIsMobileMenuOpen(false)} />
         </div>
-      </main>
-      
-    </div>
+
+        {/* MAIN CONTENT AREA */}
+        <main className="flex-1 overflow-auto bg-gray-50 pt-16 md:pt-0 relative">
+          <div className="p-4 md:p-10 max-w-7xl mx-auto min-h-full">
+            <Outlet />
+          </div>
+        </main>
+        
+      </div>
+    </>
   );
 }

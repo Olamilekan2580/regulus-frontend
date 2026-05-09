@@ -1,74 +1,70 @@
-import { useState, useEffect } from 'react';
-import { usePaystackPayment } from 'react-paystack';
-import { CheckCircle, Shield, Zap } from 'lucide-react';
+const express = require('express');
+const router = express.Router();
+const stripe = require('stripe')(process.env.PLATFORM_STRIPE_SECRET_KEY);
+const supabaseAdmin = require('../config/supabase');
+const { requireAuth } = require('../middleware/auth');
 
-export default function Billing() {
-  const [freelancerId, setFreelancerId] = useState('');
-  const [email, setEmail] = useState('');
+// GENERATE $9.99/mo CHECKOUT SESSION
+router.post('/subscribe', requireAuth, async (req, res) => {
+  try {
+    const { orgId } = req.body;
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      // Decode the JWT to get the user's ID and Email without an extra API call
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      setFreelancerId(payload.sub);
-      setEmail(payload.email || 'billing@regulus.io');
+    const { data: org } = await supabaseAdmin.from('organizations').select('*').eq('id', orgId).single();
+    if (!org) return res.status(404).json({ error: 'Organization not found' });
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      mode: 'subscription',
+      line_items: [{
+        price: process.env.STRIPE_MONTHLY_PRICE_ID, 
+        quantity: 1,
+      }],
+      client_reference_id: orgId, // Tells the webhook who paid
+      success_url: `${req.headers.origin}/?billing=success`,
+      cancel_url: `${req.headers.origin}/?billing=canceled`,
+    });
+
+    res.status(200).json({ url: session.url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PLATFORM WEBHOOK: Listens for Stripe payments to unlock the account
+router.post('/webhook', async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error('Webhook signature verification failed.', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle successful subscription
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    const orgId = session.client_reference_id;
+
+    if (orgId) {
+      await supabaseAdmin.from('organizations').update({
+        subscription_status: 'active',
+        stripe_customer_id: session.customer,
+        stripe_subscription_id: session.subscription
+      }).eq('id', orgId);
     }
-  }, []);
+  }
 
-  const config = {
-    reference: (new Date()).getTime().toString(),
-    email: email,
-    amount: 3900 * 100, // $39.00 in kobo/cents
-    publicKey: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY, // YOUR master public key
-    metadata: {
-      freelancer_id: freelancerId,
-      type: 'platform_subscription'
-    }
-  };
+  // Handle cancellation
+  if (event.type === 'customer.subscription.deleted') {
+    const subscription = event.data.object;
+    await supabaseAdmin.from('organizations').update({
+      subscription_status: 'canceled'
+    }).eq('stripe_subscription_id', subscription.id);
+  }
 
-  const initializePayment = usePaystackPayment(config);
+  res.status(200).json({ received: true });
+});
 
-  const handleSuccess = () => {
-    alert('Payment successful! Your SaaS subscription is now active.');
-    window.location.href = '/'; // Redirect to dashboard to remount context
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-        <div className="bg-navy p-8 text-center">
-          <h1 className="text-3xl font-bold text-white mb-2">Regulus Pro</h1>
-          <p className="text-gray-300">Unlock your freelance infrastructure.</p>
-        </div>
-        
-        <div className="p-8">
-          <div className="text-center mb-8">
-            <span className="text-5xl font-bold text-navy">$39</span>
-            <span className="text-gray-500 font-medium">/month</span>
-          </div>
-
-          <div className="space-y-4 mb-8">
-            {['Custom White-Label Portal', 'Zero-Trust Client Invoicing', 'Bring Your Own API Keys', 'Automated Payment Webhooks'].map((feature, i) => (
-              <div key={i} className="flex items-center gap-3 text-gray-700 font-medium">
-                <CheckCircle className="text-accent shrink-0" size={20} />
-                <span>{feature}</span>
-              </div>
-            ))}
-          </div>
-
-          <button 
-            onClick={() => initializePayment(handleSuccess, () => console.log('Closed'))}
-            className="w-full flex items-center justify-center gap-2 bg-accent text-white py-4 rounded-xl font-bold text-lg hover:bg-accent/90 transition-all shadow-md"
-          >
-            <Zap size={20} /> Activate Pro Subscription
-          </button>
-          
-          <p className="text-center text-xs text-gray-400 mt-4 flex items-center justify-center gap-1">
-            <Shield size={12} /> Secured by Paystack
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
+module.exports = router;

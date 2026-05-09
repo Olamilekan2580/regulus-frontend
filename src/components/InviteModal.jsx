@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Copy, CheckCircle2 } from 'lucide-react';
+import { Copy, CheckCircle2, X } from 'lucide-react';
 import api from '../lib/api';
 
-export default function InviteModal({ orgId }) {
+export default function InviteModal({ orgId, onClose }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('member');
   const [isSending, setIsSending] = useState(false);
@@ -42,7 +42,15 @@ export default function InviteModal({ orgId }) {
   };
 
   return (
-    <div className="p-8 bg-white rounded-2xl shadow-2xl border border-gray-100">
+    <div className="p-8 bg-white rounded-2xl shadow-2xl border border-gray-100 relative">
+      {/* NEW: Close Button for the Modal */}
+      <button 
+        onClick={onClose} 
+        className="absolute top-4 right-4 text-gray-400 hover:text-navy transition-colors"
+      >
+        <X size={20} />
+      </button>
+
       <h3 className="text-xl font-black text-navy mb-2">Invite Collaborator</h3>
       
       {!generatedLink ? (
@@ -84,7 +92,7 @@ export default function InviteModal({ orgId }) {
         </>
       ) : (
         // SUCCESS STATE UI
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 pt-2">
           <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
             <CheckCircle2 size={24} />
           </div>
@@ -105,12 +113,21 @@ export default function InviteModal({ orgId }) {
             </button>
           </div>
 
-          <button 
-            onClick={() => setGeneratedLink('')}
-            className="w-full py-3 text-sm text-gray-500 font-bold hover:text-navy transition-colors"
-          >
-            Generate Another Invite
-          </button>
+          <div className="flex gap-2 mt-6">
+            <button 
+              onClick={() => setGeneratedLink('')}
+              className="flex-1 py-3 text-sm text-gray-500 font-bold bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+            >
+              New Invite
+            </button>
+            {/* NEW: Done button to cleanly exit */}
+            <button 
+              onClick={onClose}
+              className="flex-1 py-3 text-sm text-white font-bold bg-navy rounded-xl hover:bg-navy/90 transition-colors"
+            >
+              Done
+            </button>
+          </div>
         </div>
       )}
     </div>
