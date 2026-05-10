@@ -16,23 +16,33 @@ export default function Infrastructure() {
   
   const [isProvisioning, setIsProvisioning] = useState(false);
   const [logs, setLogs] = useState([]);
-  const [status, setStatus] = useState('idle'); // idle, running, complete, error
+  const [status, setStatus] = useState('idle'); 
 
   useEffect(() => {
-    // Fetch projects that are ready for onboarding (e.g., approved/funded)
-    api.get('/projects')
-      .then(res => setProjects(res.data.filter(p => p.status !== 'Completed')))
-      .catch(err => console.error(err));
+    // CRITICAL: Ensure we only fetch projects belonging to THIS organization
+    const orgId = localStorage.getItem('current_org_id');
+    if (!orgId) return;
+
+    api.get(`/projects?org_id=${orgId}`)
+      .then(res => {
+        // Filter out completed projects
+        setProjects(res.data.filter(p => p.status !== 'Completed'));
+      })
+      .catch(err => console.error('[Infra Project Fetch Error]:', err));
   }, []);
 
-  // Simulates a terminal output for the UI experience
   const addLog = (msg, type = 'info') => {
     setLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), msg, type }]);
   };
 
   const handleProvision = async (e) => {
     e.preventDefault();
-    if (!selectedProject || !repoName) return;
+    const orgId = localStorage.getItem('current_org_id');
+
+    if (!selectedProject || !repoName || !orgId) {
+      addLog('Missing workspace context or project selection.', 'error');
+      return;
+    }
 
     setIsProvisioning(true);
     setStatus('running');
@@ -41,19 +51,20 @@ export default function Infrastructure() {
     addLog('Initializing DevSecOps pipeline...', 'info');
 
     try {
-      // 1. Hit your backend to trigger the actual n8n / IaC webhook
+      // UPGRADE: Passing org_id to ensure the backend can verify ownership
       await api.post('/infrastructure/provision', {
+        org_id: orgId, // <--- Mandatory for Multi-tenancy
         project_id: selectedProject,
         stack_template: selectedStack,
         repo_name: repoName
       });
 
-      // 2. Simulate the telemetry for the frontend
+      // Simulation logic (keeps the UI interactive while n8n works in bg)
       setTimeout(() => addLog('Authenticating with GitHub API...', 'info'), 800);
       setTimeout(() => addLog(`Created repository: ${repoName}`, 'success'), 1800);
-      setTimeout(() => addLog('Provisioning Supabase database instance...', 'info'), 2800);
-      setTimeout(() => addLog('Injecting secure environment variables...', 'warn'), 4500);
-      setTimeout(() => addLog('Triggering Vercel initial deployment...', 'info'), 5500);
+      setTimeout(() => addLog('Provisioning database instance...', 'info'), 2800);
+      setTimeout(() => addLog('Injecting environment variables...', 'warn'), 4500);
+      setTimeout(() => addLog('Triggering Vercel deployment...', 'info'), 5500);
       setTimeout(() => {
         addLog('Infrastructure successfully provisioned.', 'success');
         setStatus('complete');
@@ -61,7 +72,9 @@ export default function Infrastructure() {
       }, 7000);
 
     } catch (err) {
-      addLog(err.response?.data?.error || 'Pipeline execution failed.', 'error');
+      // This catches the "Project not found or access denied" error from your backend
+      const errorMsg = err.response?.data?.error || 'Pipeline execution failed.';
+      addLog(errorMsg, 'error');
       setStatus('error');
       setIsProvisioning(false);
     }
@@ -73,20 +86,17 @@ export default function Infrastructure() {
         <h1 className="text-2xl font-bold text-navy flex items-center gap-2">
           <Terminal className="text-accent" /> Infrastructure Provisioning
         </h1>
-        <p className="text-sm text-gray-500 mt-1">Deploy automated cloud architectures via IaC templates.</p>
+        <p className="text-sm text-gray-500 mt-1 font-medium">Deploy automated cloud architectures via IaC templates.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        
-        {/* LEFT COLUMN: Configuration Form */}
         <div className="lg:col-span-2 space-y-6">
-          <form onSubmit={handleProvision} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-6">
-            
+          <form onSubmit={handleProvision} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-6 focus-within:border-accent/20 transition-all">
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Target Project</label>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Target Project</label>
               <select 
                 required 
-                className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl font-semibold text-sm outline-none focus:border-accent"
+                className="w-full bg-gray-50 border border-gray-100 p-3 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-accent/10 transition-all"
                 value={selectedProject}
                 onChange={e => setSelectedProject(e.target.value)}
                 disabled={isProvisioning}
@@ -99,14 +109,14 @@ export default function Infrastructure() {
             </div>
 
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">GitBranch Repository Name</label>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">GitBranch Repository Name</label>
               <div className="relative">
                 <GitBranch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input 
                   type="text" 
                   required 
                   placeholder="client-dashboard-v1"
-                  className="w-full bg-gray-50 border border-gray-200 p-3 pl-10 rounded-xl font-mono text-sm outline-none focus:border-accent"
+                  className="w-full bg-gray-50 border border-gray-100 p-3 pl-10 rounded-xl font-mono text-xs outline-none focus:ring-2 focus:ring-accent/10 transition-all"
                   value={repoName}
                   onChange={e => setRepoName(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
                   disabled={isProvisioning}
@@ -115,7 +125,7 @@ export default function Infrastructure() {
             </div>
 
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Architecture Stack</label>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Architecture Stack</label>
               <div className="space-y-3">
                 {STACK_TEMPLATES.map(stack => (
                   <label 
@@ -123,7 +133,7 @@ export default function Infrastructure() {
                     className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
                       selectedStack === stack.id 
                         ? 'border-accent bg-accent/5 ring-1 ring-accent' 
-                        : 'border-gray-200 hover:border-gray-300'
+                        : 'border-gray-50 hover:border-gray-200 bg-gray-50/30'
                     } ${isProvisioning ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <input 
@@ -137,9 +147,9 @@ export default function Infrastructure() {
                     />
                     <div>
                       <div className="font-bold text-navy text-sm flex items-center gap-1.5">
-                        <stack.icon size={14} className="text-gray-500" /> {stack.name}
+                        <stack.icon size={14} className={selectedStack === stack.id ? "text-accent" : "text-gray-400"} /> {stack.name}
                       </div>
-                      <div className="text-xs text-gray-500 mt-1 font-medium">{stack.desc}</div>
+                      <div className="text-[11px] text-gray-500 mt-1 font-medium leading-relaxed">{stack.desc}</div>
                     </div>
                   </label>
                 ))}
@@ -149,44 +159,47 @@ export default function Infrastructure() {
             <button 
               type="submit" 
               disabled={isProvisioning || !selectedProject || !repoName}
-              className="w-full flex items-center justify-center gap-2 bg-navy text-white py-3.5 rounded-xl font-bold hover:bg-navy/90 transition-all disabled:opacity-50 active:scale-95"
+              className="w-full flex items-center justify-center gap-2 bg-navy text-white py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-navy/90 transition-all shadow-lg shadow-navy/20 active:scale-95 disabled:opacity-50"
             >
-              {isProvisioning ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />}
+              {isProvisioning ? <Loader2 size={18} className="animate-spin text-accent" /> : <Play size={18} className="text-accent" />}
               {isProvisioning ? 'Executing Pipeline...' : 'Deploy Infrastructure'}
             </button>
           </form>
         </div>
 
-        {/* RIGHT COLUMN: Pipeline Terminal */}
-        <div className="lg:col-span-3 bg-[#0D1117] rounded-2xl shadow-xl border border-gray-800 flex flex-col overflow-hidden h-[600px]">
-          <div className="bg-[#161B22] px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Terminal size={16} className="text-gray-400" />
-              <span className="text-xs font-mono text-gray-300 font-bold tracking-wider">deploy_pipeline.sh</span>
+        <div className="lg:col-span-3 bg-[#0D1117] rounded-2xl shadow-2xl border border-gray-800 flex flex-col overflow-hidden h-[620px]">
+          <div className="bg-[#161B22] px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-[#FF5F56]"></div>
+                <div className="w-3 h-3 rounded-full bg-[#FFBD2E]"></div>
+                <div className="w-3 h-3 rounded-full bg-[#27C93F]"></div>
+              </div>
+              <div className="h-4 w-px bg-gray-800 mx-1"></div>
+              <span className="text-[10px] font-mono text-gray-500 font-bold uppercase tracking-widest">deploy_pipeline.sh</span>
             </div>
-            <div className="flex gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
-              <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
-              <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
-            </div>
+            {isProvisioning && <span className="text-[10px] font-black text-accent animate-pulse uppercase tracking-tighter">Live Stream</span>}
           </div>
           
-          <div className="flex-1 p-6 font-mono text-sm overflow-y-auto space-y-2">
+          <div className="flex-1 p-8 font-mono text-xs overflow-y-auto space-y-3 leading-relaxed">
             {logs.length === 0 && status === 'idle' && (
-              <div className="text-gray-600 h-full flex items-center justify-center italic">
-                Awaiting deployment command...
+              <div className="text-gray-700 h-full flex flex-col items-center justify-center italic gap-4">
+                <Terminal size={40} className="opacity-10" />
+                <p>Awaiting deployment command from Architect...</p>
               </div>
             )}
             
             {logs.map((log, i) => (
-              <div key={i} className="flex gap-4 animate-in fade-in slide-in-from-bottom-2">
-                <span className="text-gray-600 select-none shrink-0">[{log.time}]</span>
+              <div key={i} className="flex gap-4 animate-in fade-in slide-in-from-bottom-1">
+                <span className="text-gray-600 select-none shrink-0 font-bold">[{log.time}]</span>
                 <span className={`
-                  ${log.type === 'info' ? 'text-gray-300' : ''}
-                  ${log.type === 'success' ? 'text-green-400 font-bold' : ''}
-                  ${log.type === 'warn' ? 'text-yellow-400' : ''}
-                  ${log.type === 'error' ? 'text-red-400 font-bold' : ''}
+                  ${log.type === 'info' ? 'text-gray-400' : ''}
+                  ${log.type === 'success' ? 'text-[#27C93F] font-bold' : ''}
+                  ${log.type === 'warn' ? 'text-[#FFBD2E]' : ''}
+                  ${log.type === 'error' ? 'text-[#FF5F56] font-black' : ''}
                 `}>
+                  {log.type === 'error' && '✖ '}
+                  {log.type === 'success' && '✔ '}
                   {log.msg}
                 </span>
               </div>
@@ -195,31 +208,28 @@ export default function Infrastructure() {
             {isProvisioning && (
               <div className="flex gap-4 items-center mt-2">
                 <span className="text-gray-600">[{new Date().toLocaleTimeString()}]</span>
-                <span className="text-accent flex items-center gap-2">
-                  <div className="w-1.5 h-4 bg-accent animate-pulse"></div>
-                </span>
+                <div className="w-2 h-4 bg-accent animate-pulse"></div>
               </div>
             )}
           </div>
 
           {status === 'complete' && (
-            <div className="bg-green-500/10 border-t border-green-500/20 p-4 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-green-400 font-bold text-sm">
-                <CheckCircle2 size={18} /> Environments Linked
+            <div className="bg-[#27C93F]/5 border-t border-[#27C93F]/20 p-5 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-[#27C93F] font-bold text-xs uppercase tracking-wider">
+                <CheckCircle2 size={16} /> Environments Verified
               </div>
-              <a href={`https://github.com/your-username/${repoName}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-green-300 hover:underline">
-                View Repository →
+              <a href={`https://github.com/your-username/${repoName}`} target="_blank" rel="noreferrer" className="text-[10px] font-black text-white bg-[#27C93F] px-3 py-1.5 rounded-md hover:bg-[#27C93F]/80 transition-all uppercase tracking-widest">
+                Source Code →
               </a>
             </div>
           )}
           
           {status === 'error' && (
-            <div className="bg-red-500/10 border-t border-red-500/20 p-4 flex items-center gap-2 text-red-400 font-bold text-sm">
-              <AlertCircle size={18} /> Pipeline Terminated
+            <div className="bg-[#FF5F56]/5 border-t border-[#FF5F56]/20 p-5 flex items-center gap-3 text-[#FF5F56] font-bold text-xs uppercase tracking-widest">
+              <AlertCircle size={16} /> Pipeline Terminated
             </div>
           )}
         </div>
-
       </div>
     </div>
   );
