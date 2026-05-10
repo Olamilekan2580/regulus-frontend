@@ -9,24 +9,22 @@ export default function CreateWorkspace() {
   const navigate = useNavigate();
 
   const handleCreate = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+  e.preventDefault();
+  setIsSubmitting(true);
+  try {
+    const res = await api.post('/orgs', { name: orgName });
+    
+    // Sync the storage
+    localStorage.setItem('current_org_id', res.data.id);
+    localStorage.setItem('current_org_name', res.data.name);
 
-    try {
-      const res = await api.post('/orgs', { name: orgName });
-      const newOrg = res.data;
-
-      // Set the IDs in storage so the Layout and API Interceptors find them
-      localStorage.setItem('current_org_id', newOrg.id);
-      localStorage.setItem('current_org_name', newOrg.name);
-
-      // Take them to the dashboard and force a refresh to boot the new context
-      window.location.href = '/'; 
-    } catch (err) {
-      alert(err.response?.data?.error || 'Failed to create workspace.');
-      setIsSubmitting(false);
-    }
-  };
+    // Redirect to home
+    window.location.href = '/'; 
+  } catch (err) {
+    alert('Failed to create workspace.');
+    setIsSubmitting(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-navy flex items-center justify-center p-6 font-sans">
