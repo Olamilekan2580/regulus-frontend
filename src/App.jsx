@@ -62,6 +62,7 @@ export default function App() {
         <Route path="join" element={<JoinOrg />} />
         <Route path="sandbox" element={<ContractSandbox />} />
         <Route path="vault" element={<Vault />} />
+        <Route path="/" element={<ProtectedRoute><TrialBanner /><Layout /></ProtectedRoute>}></Route>
       </Route>
 
       {/* Global 404 - Optional but recommended */}

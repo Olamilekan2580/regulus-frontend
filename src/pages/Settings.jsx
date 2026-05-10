@@ -120,25 +120,27 @@ export default function Settings() {
   // ==========================================
   // SUBSCRIPTION UPGRADE HANDLER
   // ==========================================
-  const handlePlanSelection = async (tier, priceType = 'recurring') => {
-    if (!window.confirm(`Initialize upgrade to the ${tier.toUpperCase()} tier?`)) return;
-    
-    setIsProcessingUpgrade(true);
-    try {
-      // In Dev Mode: Force update database bypass to test UI state
-      await api.put(`/orgs/${orgId}/plan`, { plan_tier: tier, subscription_status: 'active' });
-      
-      // Update UI state instantly without page refresh
-      setOrgData(prev => ({ ...prev, plan_tier: tier, subscription_status: 'active' }));
-      
-      alert(`[Dev Mode] Workspace successfully upgraded to ${tier.toUpperCase()}.`);
-      setShowPricingModal(false);
-    } catch (err) {
-      alert(err.response?.data?.error || 'Failed to initialize checkout sequence.');
-    } finally {
-      setIsProcessingUpgrade(false);
+  const handlePlanSelection = async (tier) => {
+  setIsProcessingUpgrade(true);
+  try {
+    // 1. Request a real checkout session from your backend
+    const res = await api.post('/billing/create-checkout-session', { 
+      plan_tier: tier, 
+      org_id: orgId 
+    });
+
+    // 2. Redirect the user to the Stripe-hosted checkout page
+    if (res.data?.url) {
+      window.location.href = res.data.url;
+    } else {
+      throw new Error('No checkout URL received.');
     }
-  };
+  } catch (err) {
+    alert(err.response?.data?.error || 'Checkout failed to initialize.');
+  } finally {
+    setIsProcessingUpgrade(false);
+  }
+};
 
   // Utility to mask API keys
   const maskKey = (key) => {
