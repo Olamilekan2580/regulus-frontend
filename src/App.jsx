@@ -14,6 +14,7 @@ import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import JoinOrg from './pages/JoinOrg';
 import ContractSandbox from './pages/ContractSandbox';
+import CreateWorkspace from './pages/CreateWorkspace';
 
 // NEW IMPORTS: The Zero-Trust Vault
 import Vault from './pages/Vault';
