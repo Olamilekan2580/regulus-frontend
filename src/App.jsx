@@ -15,23 +15,30 @@ import Settings from './pages/Settings';
 import JoinOrg from './pages/JoinOrg';
 import ContractSandbox from './pages/ContractSandbox';
 import CreateWorkspace from './pages/CreateWorkspace';
-
-// NEW IMPORTS: The Zero-Trust Vault
 import Vault from './pages/Vault';
 import SecretReveal from './pages/SecretReveal';
 
 export default function App() {
   return (
     <Routes>
-      {/* Public Routes */}
+      {/* 1. COMPLETELY PUBLIC ROUTES */}
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/portal/:token" element={<ClientPortal />} />
-      
-      {/* NEW: Public Vault Reveal (Burn-on-read) */}
       <Route path="/secret/:id" element={<SecretReveal />} />
       
-      {/* Freelancer Secure Routes */}
+      {/* 2. SEMI-PROTECTED: Needs Auth but NO Sidebar/Layout */}
+      {/* This is where new users land to create their foundation */}
+      <Route 
+        path="/setup-workspace" 
+        element={
+          <ProtectedRoute>
+            <CreateWorkspace />
+          </ProtectedRoute>
+        } 
+      />
+      
+      {/* 3. FULLY PROTECTED: Needs Auth + Org + Includes Sidebar */}
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
         <Route path="clients" element={<Clients />} />
@@ -43,11 +50,11 @@ export default function App() {
         <Route path="settings" element={<Settings />} />
         <Route path="join" element={<JoinOrg />} />
         <Route path="sandbox" element={<ContractSandbox />} />
-        <Route path="/setup-workspace" element={<CreateWorkspace />} />
-        
-        {/* NEW: Protected Agency Vault Dashboard */}
         <Route path="vault" element={<Vault />} />
       </Route>
+
+      {/* Global 404 - Optional but recommended */}
+      <Route path="*" element={<div className="flex items-center justify-center min-h-screen font-black text-navy text-4xl">404: OUT OF BOUNDS</div>} />
     </Routes>
   );
 }
