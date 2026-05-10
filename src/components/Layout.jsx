@@ -11,7 +11,9 @@ import {
   Menu, 
   X, 
   Building2, 
-  User 
+  User,
+  Shield,
+  Scale 
 } from 'lucide-react';
 import api from '../lib/api';
 import BillingWall from './BillingWall'; // NEW: The Gatekeeper Component
@@ -87,6 +89,8 @@ export default function Layout() {
     { name: 'Projects', path: '/projects', icon: FolderKanban },
     { name: 'Invoices', path: '/invoices', icon: Receipt },
     { name: 'Proposals', path: '/proposals', icon: FileText },
+    { name: 'Credential Vault', path: '/vault', icon: Shield },
+    { name: 'Contract Sandbox', path: '/sandbox', icon: Scale },
   ];
 
   const NavLinks = ({ onClick = () => {} }) => (

@@ -14,6 +14,10 @@ import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import JoinOrg from './pages/JoinOrg';
 
+// NEW IMPORTS: The Zero-Trust Vault
+import Vault from './pages/Vault';
+import SecretReveal from './pages/SecretReveal';
+
 export default function App() {
   return (
     <Routes>
@@ -22,6 +26,9 @@ export default function App() {
       <Route path="/signup" element={<Signup />} />
       <Route path="/portal/:token" element={<ClientPortal />} />
       
+      {/* NEW: Public Vault Reveal (Burn-on-read) */}
+      <Route path="/secret/:id" element={<SecretReveal />} />
+      
       {/* Freelancer Secure Routes */}
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
@@ -29,11 +36,14 @@ export default function App() {
         <Route path="projects" element={<Projects />} />
         <Route path="invoices" element={<Invoices />} />
         <Route path="proposals" element={<Proposals />} />
-        <Route path="/onboarding" element={<Onboarding />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/join" element={<JoinOrg />} />
-
+        <Route path="onboarding" element={<Onboarding />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="settings" element={<Settings />} />
+        <Route path="join" element={<JoinOrg />} />
+        <Route path="sandbox" element={<ContractSandbox />} />
+        
+        {/* NEW: Protected Agency Vault Dashboard */}
+        <Route path="vault" element={<Vault />} />
       </Route>
     </Routes>
   );
