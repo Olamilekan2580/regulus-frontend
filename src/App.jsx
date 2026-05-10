@@ -42,6 +42,7 @@ export default function App() {
         <Route path="settings" element={<Settings />} />
         <Route path="join" element={<JoinOrg />} />
         <Route path="sandbox" element={<ContractSandbox />} />
+        <Route path="/setup-workspace" element={<CreateWorkspace />} />
         
         {/* NEW: Protected Agency Vault Dashboard */}
         <Route path="vault" element={<Vault />} />
