@@ -13,6 +13,7 @@ import Onboarding from './pages/Onboarding';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import JoinOrg from './pages/JoinOrg';
+import ContractSandbox from './pages/ContractSandbox';
 
 // NEW IMPORTS: The Zero-Trust Vault
 import Vault from './pages/Vault';
