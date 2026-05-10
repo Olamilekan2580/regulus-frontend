@@ -1,21 +1,34 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Mail, Lock, User, CheckCircle, ArrowRight } from 'lucide-react';
 import api from '../lib/api';
 
 export default function Signup() {
-  const [formData, setFormData] = useState({ email: '', password: '', fullName: '' });
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get('token'); // Extract the token from the URL
+
+  const [formData, setFormData] = useState({ 
+    email: '', 
+    password: '', 
+    fullName: '',
+    inviteToken: inviteToken || '' // Inject it into the form state
+  });
+  
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+
+  // Optional: If they arrived with a token, we can pre-fill the email later 
+  // if we add an endpoint to fetch invite details, but for now, sending the token is enough.
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
+      // The backend auth.js we updated will now see the inviteToken in this payload
       await api.post('/auth/signup', formData);
-      setIsSubmitted(true); // Trigger the success UI
+      setIsSubmitted(true);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create account');
       setLoading(false);
@@ -48,8 +61,12 @@ export default function Signup() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-navy mb-2">Create Account</h1>
-          <p className="text-gray-500">Start managing your freelance business.</p>
+          <h1 className="text-3xl font-bold text-navy mb-2">
+            {inviteToken ? 'Join Workspace' : 'Create Account'}
+          </h1>
+          <p className="text-gray-500">
+            {inviteToken ? 'You have been invited to collaborate.' : 'Start managing your freelance business.'}
+          </p>
         </div>
 
         {error && <div className="mb-6 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">{error}</div>}
@@ -80,7 +97,7 @@ export default function Signup() {
           </div>
 
           <button disabled={loading} type="submit" className="w-full flex items-center justify-center gap-2 bg-accent text-white py-2.5 rounded-lg font-medium hover:bg-accent/90 transition-colors mt-2 disabled:opacity-70">
-            {loading ? 'Creating Account...' : 'Sign Up'} <ArrowRight size={18} />
+            {loading ? 'Creating Account...' : (inviteToken ? 'Accept Invitation' : 'Sign Up')} <ArrowRight size={18} />
           </button>
         </form>
 
