@@ -22,6 +22,7 @@ export default function Settings() {
   const [paystackPk, setPaystackPk] = useState('');
   const [paystackSk, setPaystackSk] = useState('');
   const [isSavingPayments, setIsSavingPayments] = useState(false);
+  const [isProcessingUpgrade, setIsProcessingUpgrade] = useState(false);
   
   // UI Lock State
   const [isEditingPayments, setIsEditingPayments] = useState(true);
@@ -113,6 +114,29 @@ export default function Settings() {
       setMembers(members.filter(m => m.user_id !== userId));
     } catch (err) {
       alert('Failed to remove member.');
+    }
+  };
+
+  // ==========================================
+  // SUBSCRIPTION UPGRADE HANDLER
+  // ==========================================
+  const handlePlanSelection = async (tier, priceType = 'recurring') => {
+    if (!window.confirm(`Initialize upgrade to the ${tier.toUpperCase()} tier?`)) return;
+    
+    setIsProcessingUpgrade(true);
+    try {
+      // In Dev Mode: Force update database bypass to test UI state
+      await api.put(`/orgs/${orgId}/plan`, { plan_tier: tier, subscription_status: 'active' });
+      
+      // Update UI state instantly without page refresh
+      setOrgData(prev => ({ ...prev, plan_tier: tier, subscription_status: 'active' }));
+      
+      alert(`[Dev Mode] Workspace successfully upgraded to ${tier.toUpperCase()}.`);
+      setShowPricingModal(false);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to initialize checkout sequence.');
+    } finally {
+      setIsProcessingUpgrade(false);
     }
   };
 
@@ -324,7 +348,13 @@ export default function Settings() {
                   <li className="flex items-start gap-2 text-sm text-gray-700 font-medium"><CheckCircle2 size={16} className="text-accent shrink-0 mt-0.5"/> Unlimited Clients</li>
                   <li className="flex items-start gap-2 text-sm text-gray-700 font-medium"><CheckCircle2 size={16} className="text-accent shrink-0 mt-0.5"/> Standard White-labeling</li>
                 </ul>
-                <button className="w-full py-3 rounded-xl font-bold bg-gray-100 text-navy hover:bg-gray-200 transition-colors">Select Solo</button>
+                <button 
+                  onClick={() => handlePlanSelection('solo')}
+                  disabled={isProcessingUpgrade || orgData?.plan_tier === 'solo'}
+                  className="w-full py-3 rounded-xl font-bold bg-gray-100 text-navy hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {orgData?.plan_tier === 'solo' ? 'Current Plan' : 'Select Solo'}
+                </button>
               </div>
 
               {/* Agency Plan */}
@@ -338,7 +368,13 @@ export default function Settings() {
                   <li className="flex items-start gap-2 text-sm text-gray-300 font-medium"><CheckCircle2 size={16} className="text-accent shrink-0 mt-0.5"/> Unlimited Clients & Projects</li>
                   <li className="flex items-start gap-2 text-sm text-gray-300 font-medium"><CheckCircle2 size={16} className="text-accent shrink-0 mt-0.5"/> Advanced Permissions</li>
                 </ul>
-                <button className="w-full py-3 rounded-xl font-bold bg-accent text-navy hover:bg-accent/90 transition-all shadow-[0_0_15px_rgba(0,200,150,0.3)]">Upgrade to Agency</button>
+                <button 
+                  onClick={() => handlePlanSelection('agency')}
+                  disabled={isProcessingUpgrade || orgData?.plan_tier === 'agency'}
+                  className="w-full py-3 rounded-xl font-bold bg-accent text-navy hover:bg-accent/90 transition-all shadow-[0_0_15px_rgba(0,200,150,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isProcessingUpgrade ? 'Processing...' : (orgData?.plan_tier === 'agency' ? 'Current Plan' : 'Upgrade to Agency')}
+                </button>
               </div>
 
               {/* White-Label Setup */}
@@ -351,7 +387,13 @@ export default function Settings() {
                   <li className="flex items-start gap-2 text-sm text-gray-700 font-medium"><CheckCircle2 size={16} className="text-accent shrink-0 mt-0.5"/> Custom Domain Mapping</li>
                   <li className="flex items-start gap-2 text-sm text-gray-700 font-medium"><CheckCircle2 size={16} className="text-accent shrink-0 mt-0.5"/> Hands-free Onboarding</li>
                 </ul>
-                <button className="w-full py-3 rounded-xl font-bold bg-gray-100 text-navy hover:bg-gray-200 transition-colors">Request Setup</button>
+                <button 
+                  onClick={() => handlePlanSelection('enterprise', 'one-time')}
+                  disabled={isProcessingUpgrade}
+                  className="w-full py-3 rounded-xl font-bold bg-gray-100 text-navy hover:bg-gray-200 transition-colors disabled:opacity-50"
+                >
+                  Request Setup
+                </button>
               </div>
 
             </div>
