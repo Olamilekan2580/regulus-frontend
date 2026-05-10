@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Receipt, Calendar, DollarSign, Download, CheckCircle } from 'lucide-react';
+import { Plus, Receipt, Calendar, DollarSign, Download, CheckCircle, Trash2, PlusCircle } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import api from '../lib/api';
 
@@ -18,13 +18,14 @@ export default function Invoices() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [downloadingId, setDownloadingId] = useState(null);
   
+  // UPGRADE: Added line_items array to state
   const [formData, setFormData] = useState({ 
     client_id: '', 
     invoice_number: `INV-${Math.floor(1000 + Math.random() * 9000)}`, 
-    total: '', 
     currency: 'USD',
     status: 'Draft', 
-    due_date: '' 
+    due_date: '',
+    line_items: [{ description: '', quantity: 1, rate: 0 }]
   });
 
   const fetchData = async () => {
@@ -47,6 +48,33 @@ export default function Invoices() {
 
   useEffect(() => { fetchData(); }, []);
 
+  // --- LINE ITEM LOGIC ---
+  const handleAddLineItem = () => {
+    setFormData(prev => ({
+      ...prev,
+      line_items: [...prev.line_items, { description: '', quantity: 1, rate: 0 }]
+    }));
+  };
+
+  const handleRemoveLineItem = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      line_items: prev.line_items.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleLineItemChange = (index, field, value) => {
+    const updatedItems = [...formData.line_items];
+    updatedItems[index][field] = value;
+    setFormData({ ...formData, line_items: updatedItems });
+  };
+
+  // Auto-calculate total from line items
+  const calculateTotal = () => {
+    return formData.line_items.reduce((sum, item) => sum + (parseFloat(item.quantity) * parseFloat(item.rate || 0)), 0);
+  };
+  // -----------------------
+
   const getClientDetails = (clientId) => {
     const foundClient = clients.find(c => c.id === clientId);
     if (!foundClient) return { name: 'Unknown Client', email: 'No email provided' };
@@ -59,18 +87,27 @@ export default function Invoices() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/invoices', { ...formData, total: parseFloat(formData.total) });
+      // Calculate final total right before sending
+      const finalTotal = calculateTotal();
+      
+      await api.post('/invoices', { 
+        ...formData, 
+        total: finalTotal 
+      });
+      
       setIsModalOpen(false);
-      // Reset form with new invoice number
+      // Reset form
       setFormData({
-        ...formData,
+        client_id: clients.length > 0 ? clients[0].id : '',
         invoice_number: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
-        total: '',
-        due_date: ''
+        currency: 'USD',
+        status: 'Draft',
+        due_date: '',
+        line_items: [{ description: '', quantity: 1, rate: 0 }]
       });
       fetchData();
     } catch (err) { 
-      console.error('Failed to create invoice'); 
+      console.error('Failed to create invoice', err); 
     }
   };
 
@@ -97,6 +134,16 @@ export default function Invoices() {
         ? `<div style="position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 150px; font-weight: 900; color: rgba(0, 200, 150, 0.08); z-index: 0; pointer-events: none; letter-spacing: 15px;">PAID</div>` 
         : '';
 
+      // UPGRADE: Dynamically loop through line items to generate HTML rows
+      const itemsHtml = (invoice.line_items || []).map(item => `
+        <tr>
+          <td style="padding: 24px 16px; border-bottom: 1px solid #f1f5f9; font-size: 15px;">${item.description || 'Service'}</td>
+          <td style="padding: 24px 16px; border-bottom: 1px solid #f1f5f9; font-size: 15px; text-align: center;">${item.quantity}</td>
+          <td style="padding: 24px 16px; border-bottom: 1px solid #f1f5f9; font-size: 15px; text-align: right;">${symbol}${parseFloat(item.rate).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+          <td style="padding: 24px 16px; border-bottom: 1px solid #f1f5f9; font-size: 15px; font-weight: 600; text-align: right;">${symbol}${(item.quantity * item.rate).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+        </tr>
+      `).join('');
+
       const htmlContent = `
         <div style="font-family: 'Inter', system-ui, sans-serif; padding: 60px; color: #0A0F1E; background: white; min-height: 1056px; position: relative;">
           ${watermark}
@@ -118,6 +165,8 @@ export default function Invoices() {
               <div style="color: #64748b; font-size: 14px;">${clientData.email}</div>
             </div>
             <div style="text-align: right">
+              <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #94a3b8; margin-bottom: 8px;">Date Issued</div>
+              <div style="font-weight: 600; font-size: 14px; margin-bottom: 16px;">${dateIssued}</div>
               <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #94a3b8; margin-bottom: 8px;">Due Date</div>
               <div style="font-weight: 600; font-size: 14px;">${dueDate}</div>
             </div>
@@ -127,14 +176,13 @@ export default function Invoices() {
             <thead>
               <tr style="background: #f8fafc;">
                 <th style="text-align: left; padding: 16px; font-size: 12px; color: #64748b; text-transform: uppercase;">Description</th>
+                <th style="text-align: center; padding: 16px; font-size: 12px; color: #64748b; text-transform: uppercase;">Qty / Hrs</th>
+                <th style="text-align: right; padding: 16px; font-size: 12px; color: #64748b; text-transform: uppercase;">Rate</th>
                 <th style="text-align: right; padding: 16px; font-size: 12px; color: #64748b; text-transform: uppercase;">Amount</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td style="padding: 24px 16px; border-bottom: 1px solid #f1f5f9; font-size: 15px;">Professional Services & Automation</td>
-                <td style="padding: 24px 16px; border-bottom: 1px solid #f1f5f9; font-size: 15px; font-weight: 600; text-align: right;">${symbol}${parseFloat(invoice.total).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-              </tr>
+              ${itemsHtml}
             </tbody>
           </table>
 
@@ -175,7 +223,7 @@ export default function Invoices() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-navy">Invoices</h1>
-          <p className="text-sm text-gray-500 mt-1">Global billing and currency tracking</p>
+          <p className="text-sm text-gray-500 mt-1">Global billing and dynamic line items</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)} 
@@ -251,42 +299,68 @@ export default function Invoices() {
         </div>
       )}
       
-      {/* Modal Upgrade: Currency Support */}
+      {/* Modal Upgrade: Dynamic Line Items */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-8 w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
-            <h2 className="text-2xl font-bold text-navy mb-2">Create Global Invoice</h2>
-            <p className="text-sm text-gray-500 mb-8 font-medium">Set currency and billing details below.</p>
+        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl p-8 w-full max-w-3xl shadow-2xl animate-in zoom-in-95 duration-200 my-8">
+            <h2 className="text-2xl font-bold text-navy mb-2">Create Invoice</h2>
+            <p className="text-sm text-gray-500 mb-8 font-medium">Add specific deliverables, hours, or services.</p>
             
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Select Client</label>
-                <select required className="w-full bg-gray-50 border border-gray-100 p-3 rounded-xl outline-none focus:ring-2 focus:ring-accent/20 transition-all font-semibold text-sm" value={formData.client_id} onChange={e => setFormData({...formData, client_id: e.target.value})}>
-                  {clients.map(c => <option key={c.id} value={c.id}>{c.company || c.name}</option>)}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Currency</label>
-                  <select className="w-full bg-gray-50 border border-gray-100 p-3 rounded-xl outline-none font-semibold text-sm" value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value})}>
-                    {Object.keys(currencySymbols).map(code => <option key={code} value={code}>{code} ({currencySymbols[code]})</option>)}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Select Client</label>
+                  <select required className="w-full bg-gray-50 border border-gray-100 p-3 rounded-xl outline-none focus:ring-2 focus:ring-accent/20 transition-all font-semibold text-sm" value={formData.client_id} onChange={e => setFormData({...formData, client_id: e.target.value})}>
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.company || c.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Amount</label>
-                  <input type="number" step="0.01" required className="w-full bg-gray-50 border border-gray-100 p-3 rounded-xl font-bold text-sm" value={formData.total} onChange={e => setFormData({...formData, total: e.target.value})} placeholder="0.00" />
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Due Date</label>
+                  <input type="date" required className="w-full bg-gray-50 border border-gray-100 p-3 rounded-xl font-semibold text-sm" value={formData.due_date} onChange={e => setFormData({...formData, due_date: e.target.value})} />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Due Date</label>
-                <input type="date" required className="w-full bg-gray-50 border border-gray-100 p-3 rounded-xl font-semibold text-sm" value={formData.due_date} onChange={e => setFormData({...formData, due_date: e.target.value})} />
+              {/* DYNAMIC LINE ITEMS SECTION */}
+              <div className="mt-8">
+                <div className="flex justify-between items-center mb-4">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Line Items</label>
+                  <select className="bg-gray-50 border border-gray-100 px-3 py-1 rounded-lg text-xs font-bold outline-none" value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value})}>
+                    {Object.keys(currencySymbols).map(code => <option key={code} value={code}>{code} ({currencySymbols[code]})</option>)}
+                  </select>
+                </div>
+
+                <div className="space-y-3">
+                  {formData.line_items.map((item, index) => (
+                    <div key={index} className="flex gap-3 items-start group">
+                      <div className="flex-1">
+                        <input type="text" placeholder="Description (e.g., API Integration)" required className="w-full border border-gray-200 p-3 rounded-xl text-sm" value={item.description} onChange={e => handleLineItemChange(index, 'description', e.target.value)} />
+                      </div>
+                      <div className="w-24">
+                        <input type="number" min="1" step="0.5" placeholder="Qty" required className="w-full border border-gray-200 p-3 rounded-xl text-sm text-center" value={item.quantity} onChange={e => handleLineItemChange(index, 'quantity', e.target.value)} />
+                      </div>
+                      <div className="w-32">
+                        <input type="number" min="0" step="0.01" placeholder="Rate" required className="w-full border border-gray-200 p-3 rounded-xl text-sm text-right" value={item.rate} onChange={e => handleLineItemChange(index, 'rate', e.target.value)} />
+                      </div>
+                      <button type="button" onClick={() => handleRemoveLineItem(index)} disabled={formData.line_items.length === 1} className="p-3 text-gray-300 hover:text-red-500 transition-colors disabled:opacity-30">
+                        <Trash2 size={20} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <button type="button" onClick={handleAddLineItem} className="mt-4 flex items-center gap-2 text-sm font-bold text-accent hover:text-accent/80 transition-colors">
+                  <PlusCircle size={16} /> Add Item
+                </button>
               </div>
 
-              <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-50">
+              <div className="bg-gray-50 p-6 rounded-xl flex justify-between items-center mt-6 border border-gray-100">
+                <span className="text-gray-500 font-bold uppercase text-sm tracking-wider">Total</span>
+                <span className="text-2xl font-black text-navy">{currencySymbols[formData.currency] || '$'}{calculateTotal().toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-6">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-sm font-bold text-gray-400 hover:text-navy">Discard</button>
-                <button type="submit" className="px-8 py-2.5 bg-navy text-white rounded-xl font-bold hover:shadow-lg hover:shadow-navy/20 transition-all">Generate & Save</button>
+                <button type="submit" className="px-8 py-2.5 bg-navy text-white rounded-xl font-bold hover:shadow-lg hover:shadow-navy/20 transition-all">Generate Invoice</button>
               </div>
             </form>
           </div>
