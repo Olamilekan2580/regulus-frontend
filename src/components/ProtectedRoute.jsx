@@ -7,12 +7,9 @@ import api from '../lib/api';
 export default function ProtectedRoute({ children }) {
   const { user, loading: authLoading } = useAuth();
   const location = useLocation();
-  
-  // New state to hold the absolute truth from the backend
   const [workspaceStatus, setWorkspaceStatus] = useState(null); 
 
   useEffect(() => {
-    // Only ping the backend if the user is actually logged in
     if (user) {
       api.get('/orgs/me')
         .then(res => {
@@ -23,11 +20,10 @@ export default function ProtectedRoute({ children }) {
           }
         })
         .catch(() => {
-          // If no org exists yet (404), they are definitely incomplete
           setWorkspaceStatus('incomplete');
         });
     }
-  }, [user]); // Only re-run if the user object changes
+  }, [user]);
 
   // 1. LOADING: Wait for both Supabase Auth AND our Backend to respond
   if (authLoading || (user && !workspaceStatus)) {
@@ -44,10 +40,13 @@ export default function ProtectedRoute({ children }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // 3. INCOMPLETE WORKSPACE: Trap them in onboarding
+  // 3. INCOMPLETE WORKSPACE: BYPASS ENABLED
+  // We are commenting this out so you aren't trapped on the onboarding page
+  /*
   if (workspaceStatus === 'incomplete' && location.pathname !== '/onboarding') {
     return <Navigate to="/onboarding" replace />;
   }
+  */
 
   // 4. COMPLETE WORKSPACE: Ban them from the onboarding page
   if (workspaceStatus === 'complete' && location.pathname === '/onboarding') {

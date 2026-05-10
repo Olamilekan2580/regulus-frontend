@@ -8,7 +8,7 @@ const STACK_TEMPLATES = [
   { id: 'n8n-bubble-sync', name: 'Bubble UI + n8n Backend', desc: 'No-code frontend with advanced automated routing.', icon: Terminal }
 ];
 
-export default function Onboarding() {
+export default function Infrastructure() {
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState('');
   const [selectedStack, setSelectedStack] = useState(STACK_TEMPLATES[0].id);

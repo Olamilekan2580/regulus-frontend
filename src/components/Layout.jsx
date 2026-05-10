@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate, } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Users, 
@@ -13,7 +13,8 @@ import {
   Building2, 
   User,
   Shield,
-  Scale 
+  Scale,
+  Terminal 
 } from 'lucide-react';
 import api from '../lib/api';
 import BillingWall from './BillingWall'; // NEW: The Gatekeeper Component
@@ -91,6 +92,7 @@ export default function Layout() {
     { name: 'Proposals', path: '/proposals', icon: FileText },
     { name: 'Credential Vault', path: '/vault', icon: Shield },
     { name: 'Contract Sandbox', path: '/sandbox', icon: Scale },
+    { name: 'Infrastructure', path: '/infrastructure', icon: Terminal },
   ];
 
   const NavLinks = ({ onClick = () => {} }) => (
