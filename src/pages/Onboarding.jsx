@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Server, Database, Github, Terminal, Play, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Server, Database, GitBranch, Terminal, Play, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import api from '../lib/api';
 
 const STACK_TEMPLATES = [
@@ -99,9 +99,9 @@ export default function Onboarding() {
             </div>
 
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">GitHub Repository Name</label>
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">GitBranch Repository Name</label>
               <div className="relative">
-                <Github className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                <GitBranch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input 
                   type="text" 
                   required 
