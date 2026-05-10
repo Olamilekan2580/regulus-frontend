@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Users, Palette, Trash2, ShieldAlert, CreditCard, Copy, Crown, Clock } from 'lucide-react';
+import { Users, Palette, Trash2, ShieldAlert, CreditCard, Copy, Crown, Lock, Edit2, CheckCircle2, Zap } from 'lucide-react';
 import InviteModal from '../components/InviteModal';
 import api from '../lib/api';
 
 export default function Settings() {
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
   const [members, setMembers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [orgData, setOrgData] = useState(null);
@@ -15,12 +16,15 @@ export default function Settings() {
   const [isSavingTheme, setIsSavingTheme] = useState(false);
 
   // Payment States
-  const [provider, setProvider] = useState('paystack');
+  const [provider, setProvider] = useState('stripe');
   const [stripePk, setStripePk] = useState('');
   const [stripeSk, setStripeSk] = useState('');
   const [paystackPk, setPaystackPk] = useState('');
   const [paystackSk, setPaystackSk] = useState('');
   const [isSavingPayments, setIsSavingPayments] = useState(false);
+  
+  // UI Lock State
+  const [isEditingPayments, setIsEditingPayments] = useState(true);
 
   const orgId = localStorage.getItem('current_org_id'); 
 
@@ -37,21 +41,25 @@ export default function Settings() {
         const data = brandRes.data;
         setOrgData(data);
         
-        // Robust Theme Hydration
         if (data?.brand_settings) {
           const brand = typeof data.brand_settings === 'string' ? JSON.parse(data.brand_settings) : data.brand_settings;
           if (brand.primary) setNavyColor(brand.primary);
           if (brand.accent) setAccentColor(brand.accent);
         }
 
-        // Robust Payment Hydration (Fixes the "disappearing" bug)
         if (data?.payment_settings) {
           const pay = typeof data.payment_settings === 'string' ? JSON.parse(data.payment_settings) : data.payment_settings;
+          
           if (pay.provider) setProvider(pay.provider);
           if (pay.stripe_pk) setStripePk(pay.stripe_pk);
           if (pay.stripe_sk) setStripeSk(pay.stripe_sk);
           if (pay.paystack_pk) setPaystackPk(pay.paystack_pk);
           if (pay.paystack_sk) setPaystackSk(pay.paystack_sk);
+
+          // If they have ANY keys saved, lock the vault UI
+          if (pay.stripe_pk || pay.paystack_pk) {
+            setIsEditingPayments(false);
+          }
         }
 
         setMembers(teamRes.data || []);
@@ -88,7 +96,8 @@ export default function Settings() {
         paystack_pk: paystackPk, 
         paystack_sk: paystackSk 
       });
-      alert('Payment Configuration locked securely.');
+      // Lock the vault upon successful save
+      setIsEditingPayments(false);
     } catch (err) {
       alert('Failed to save payment settings.');
     } finally {
@@ -105,6 +114,12 @@ export default function Settings() {
     } catch (err) {
       alert('Failed to remove member.');
     }
+  };
+
+  // Utility to mask API keys
+  const maskKey = (key) => {
+    if (!key) return 'Not Configured';
+    return key.substring(0, 8) + '••••••••••••••••' + key.slice(-4);
   };
 
   if (isLoading) return <div className="flex justify-center p-12"><div className="animate-spin w-8 h-8 border-2 border-navy border-t-transparent rounded-full"></div></div>;
@@ -143,64 +158,103 @@ export default function Settings() {
               <p className="text-sm text-gray-400 font-medium mt-2 max-w-md">Upgrade to Agency to unlock unlimited team members and remove white-labeling restrictions.</p>
             </div>
             <div className="shrink-0">
-              <button className="bg-accent text-navy px-8 py-3 rounded-xl font-bold hover:bg-accent/90 transition-all shadow-[0_0_20px_rgba(0,200,150,0.3)] active:scale-95">
+              <button onClick={() => setShowPricingModal(true)} className="bg-accent text-navy px-8 py-3 rounded-xl font-bold hover:bg-accent/90 transition-all shadow-[0_0_20px_rgba(0,200,150,0.3)] active:scale-95">
                 Upgrade Workspace
               </button>
             </div>
           </div>
         </section>
 
-        {/* FINANCIAL INTEGRATIONS */}
+        {/* SECURE FINANCIAL INTEGRATIONS */}
         <section className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-green-100 text-green-600 rounded-lg"><CreditCard size={20} /></div>
-            <div>
-              <h2 className="text-xl font-bold text-navy">Payment Gateway</h2>
-              <p className="text-sm text-gray-500 font-medium mt-1">Connect your preferred processor to get paid directly.</p>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-100 text-green-600 rounded-lg"><CreditCard size={20} /></div>
+              <div>
+                <h2 className="text-xl font-bold text-navy">Payment Vault</h2>
+                <p className="text-sm text-gray-500 font-medium mt-1">Connect your preferred processor to get paid directly.</p>
+              </div>
             </div>
+            {!isEditingPayments && (
+              <button onClick={() => setIsEditingPayments(true)} className="flex items-center gap-1.5 text-xs font-bold text-navy hover:text-accent transition-colors bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
+                <Edit2 size={14} /> Update Keys
+              </button>
+            )}
           </div>
           
-          <div className="space-y-6">
-            <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Active Gateway</label>
-              <select value={provider} onChange={(e) => setProvider(e.target.value)} className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl font-bold text-navy outline-none focus:border-accent transition-colors appearance-none cursor-pointer">
-                <option value="stripe">Stripe (Global / USD)</option>
-                <option value="paystack">Paystack (Africa / NGN / USD)</option>
-              </select>
+          {isEditingPayments ? (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <div>
+                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Active Gateway</label>
+                <select value={provider} onChange={(e) => setProvider(e.target.value)} className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl font-bold text-navy outline-none focus:border-accent transition-colors appearance-none cursor-pointer">
+                  <option value="stripe">Stripe (Global / USD)</option>
+                  <option value="paystack">Paystack (Africa / NGN / USD)</option>
+                </select>
+              </div>
+
+              {provider === 'stripe' && (
+                <div className="grid md:grid-cols-2 gap-4 animate-in slide-in-from-top-2">
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Publishable Key</label>
+                    <input type="text" value={stripePk} onChange={(e) => setStripePk(e.target.value)} placeholder="pk_live_..." className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-accent font-mono text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Secret Key</label>
+                    <input type="password" value={stripeSk} onChange={(e) => setStripeSk(e.target.value)} placeholder="sk_live_..." className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-accent font-mono text-sm" />
+                  </div>
+                </div>
+              )}
+
+              {provider === 'paystack' && (
+                <div className="grid md:grid-cols-2 gap-4 animate-in slide-in-from-top-2">
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Public Key</label>
+                    <input type="text" value={paystackPk} onChange={(e) => setPaystackPk(e.target.value)} placeholder="pk_live_..." className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-accent font-mono text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Secret Key</label>
+                    <input type="password" value={paystackSk} onChange={(e) => setPaystackSk(e.target.value)} placeholder="sk_live_..." className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-accent font-mono text-sm" />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 border-t border-gray-50 pt-6 mt-6">
+                {(stripePk || paystackPk) && (
+                  <button onClick={() => setIsEditingPayments(false)} className="px-5 py-2.5 text-gray-500 font-bold hover:bg-gray-50 rounded-xl transition-all">Cancel</button>
+                )}
+                <button onClick={handleSavePayments} disabled={isSavingPayments} className="flex items-center gap-2 px-6 py-2.5 bg-green-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-green-600/20 transition-all active:scale-95 disabled:opacity-50">
+                  <Lock size={16} /> {isSavingPayments ? 'Securing Vault...' : 'Lock Configuration'}
+                </button>
+              </div>
             </div>
-
-            {provider === 'stripe' && (
-              <div className="grid md:grid-cols-2 gap-4 animate-in fade-in duration-300">
-                <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Publishable Key</label>
-                  <input type="text" value={stripePk} onChange={(e) => setStripePk(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-accent font-mono text-sm" />
+          ) : (
+            // LOCKED VIEW
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in duration-300">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center font-black text-navy text-xl uppercase">
+                  {provider === 'stripe' ? 'STR' : 'PAY'}
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Secret Key</label>
-                  <input type="password" value={stripeSk} onChange={(e) => setStripeSk(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-accent font-mono text-sm" />
-                </div>
-              </div>
-            )}
-
-            {provider === 'paystack' && (
-              <div className="grid md:grid-cols-2 gap-4 animate-in fade-in duration-300">
-                <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Public Key</label>
-                  <input type="text" value={paystackPk} onChange={(e) => setPaystackPk(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-accent font-mono text-sm" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Secret Key</label>
-                  <input type="password" value={paystackSk} onChange={(e) => setPaystackSk(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-accent font-mono text-sm" />
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Active Gateway</p>
+                  <p className="font-bold text-navy capitalize text-lg">{provider}</p>
                 </div>
               </div>
-            )}
-          </div>
-
-          <div className="flex justify-end border-t border-gray-50 pt-6 mt-6">
-            <button onClick={handleSavePayments} disabled={isSavingPayments} className="px-6 py-2.5 bg-green-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-green-600/20 transition-all active:scale-95 disabled:opacity-50">
-              {isSavingPayments ? 'Securing...' : 'Save Configuration'}
-            </button>
-          </div>
+              
+              <div className="text-left md:text-right">
+                <p className="text-[10px] font-black text-green-500 uppercase tracking-widest mb-2 flex items-center md:justify-end gap-1.5">
+                  <Lock size={12} /> Vault Secured
+                </p>
+                <div className="space-y-1">
+                  <p className="font-mono text-xs text-gray-500 bg-white border border-gray-100 px-3 py-1.5 rounded-md">
+                    PK: {provider === 'stripe' ? maskKey(stripePk) : maskKey(paystackPk)}
+                  </p>
+                  <p className="font-mono text-xs text-gray-400 px-3 py-1">
+                    SK: ••••••••••••••••••••••••
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Dynamic Branding Section */}
@@ -235,45 +289,10 @@ export default function Settings() {
             </button>
           </div>
         </section>
-
-        {/* Team Management Section */}
-        <section className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-navy text-white rounded-lg"><Users size={20} /></div>
-              <h2 className="text-xl font-bold text-navy">Team Members</h2>
-            </div>
-            <button onClick={() => setShowInviteModal(true)} className="bg-accent text-white px-4 py-2 rounded-lg font-bold hover:bg-accent/90 transition-all active:scale-95">
-              Invite Member
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {members.length === 0 ? (
-              <p className="text-sm text-gray-400 italic font-medium">No other members in this organization yet.</p>
-            ) : (
-              members.map((member) => (
-                <div key={member.user_id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
-                  <div>
-                    <p className="font-bold text-navy">{member.email}</p>
-                    <p className="text-xs text-gray-500 flex items-center gap-1 uppercase tracking-widest mt-1">
-                      {member.role === 'owner' && <ShieldAlert size={12} className="text-accent" />}
-                      {member.role}
-                    </p>
-                  </div>
-                  {member.role !== 'owner' && (
-                    <button onClick={() => handleRemoveMember(member.user_id, member.role)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                      <Trash2 size={18} />
-                    </button>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </section>
         
       </div>
 
+      {/* MODALS */}
       {showInviteModal && (
         <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="relative w-full max-w-md animate-in zoom-in-95 duration-200">
@@ -281,6 +300,65 @@ export default function Settings() {
           </div>
         </div>
       )}
+
+      {/* PRICING MODAL */}
+      {showPricingModal && (
+        <div className="fixed inset-0 bg-navy/80 backdrop-blur-md flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-gray-50 rounded-3xl w-full max-w-5xl shadow-2xl animate-in zoom-in-95 duration-200 my-8 overflow-hidden flex flex-col">
+            <div className="bg-navy p-8 text-center relative">
+              <button onClick={() => setShowPricingModal(false)} className="absolute top-6 right-6 text-white/50 hover:text-white font-bold text-sm uppercase tracking-widest transition-colors">Close</button>
+              <h2 className="text-3xl font-black text-white mb-2">Scale Your Agency</h2>
+              <p className="text-gray-400 font-medium max-w-lg mx-auto">Select the plan that fits your current operational volume. All plans include the AI Sandbox and automated invoices.</p>
+            </div>
+            
+            <div className="p-8 grid md:grid-cols-3 gap-6">
+              
+              {/* Solo Plan */}
+              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm flex flex-col relative">
+                {orgData?.plan_tier === 'solo' && <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">Current Plan</div>}
+                <h3 className="text-xl font-bold text-navy mb-1">Solo</h3>
+                <p className="text-sm text-gray-500 font-medium mb-6">Perfect for independent freelancers.</p>
+                <div className="mb-6"><span className="text-4xl font-black text-navy">$29</span><span className="text-gray-500 font-medium">/month</span></div>
+                <ul className="space-y-3 mb-8 flex-1">
+                  <li className="flex items-start gap-2 text-sm text-gray-700 font-medium"><CheckCircle2 size={16} className="text-accent shrink-0 mt-0.5"/> 1 User Account</li>
+                  <li className="flex items-start gap-2 text-sm text-gray-700 font-medium"><CheckCircle2 size={16} className="text-accent shrink-0 mt-0.5"/> Unlimited Clients</li>
+                  <li className="flex items-start gap-2 text-sm text-gray-700 font-medium"><CheckCircle2 size={16} className="text-accent shrink-0 mt-0.5"/> Standard White-labeling</li>
+                </ul>
+                <button className="w-full py-3 rounded-xl font-bold bg-gray-100 text-navy hover:bg-gray-200 transition-colors">Select Solo</button>
+              </div>
+
+              {/* Agency Plan */}
+              <div className="bg-navy rounded-2xl p-6 border border-navy shadow-xl flex flex-col relative transform md:-translate-y-4">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-accent text-navy text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full flex items-center gap-1"><Zap size={10}/> Recommended</div>
+                <h3 className="text-xl font-bold text-white mb-1">Agency</h3>
+                <p className="text-sm text-gray-400 font-medium mb-6">For growing teams and studios.</p>
+                <div className="mb-6"><span className="text-4xl font-black text-white">$99</span><span className="text-gray-400 font-medium">/month</span></div>
+                <ul className="space-y-3 mb-8 flex-1">
+                  <li className="flex items-start gap-2 text-sm text-gray-300 font-medium"><CheckCircle2 size={16} className="text-accent shrink-0 mt-0.5"/> Up to 5 Team Members</li>
+                  <li className="flex items-start gap-2 text-sm text-gray-300 font-medium"><CheckCircle2 size={16} className="text-accent shrink-0 mt-0.5"/> Unlimited Clients & Projects</li>
+                  <li className="flex items-start gap-2 text-sm text-gray-300 font-medium"><CheckCircle2 size={16} className="text-accent shrink-0 mt-0.5"/> Advanced Permissions</li>
+                </ul>
+                <button className="w-full py-3 rounded-xl font-bold bg-accent text-navy hover:bg-accent/90 transition-all shadow-[0_0_15px_rgba(0,200,150,0.3)]">Upgrade to Agency</button>
+              </div>
+
+              {/* White-Label Setup */}
+              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm flex flex-col relative">
+                <h3 className="text-xl font-bold text-navy mb-1">Full Setup</h3>
+                <p className="text-sm text-gray-500 font-medium mb-6">We configure your entire system.</p>
+                <div className="mb-6"><span className="text-4xl font-black text-navy">$299</span><span className="text-gray-500 font-medium"> one-time</span></div>
+                <ul className="space-y-3 mb-8 flex-1">
+                  <li className="flex items-start gap-2 text-sm text-gray-700 font-medium"><CheckCircle2 size={16} className="text-accent shrink-0 mt-0.5"/> Complete Gateway Integration</li>
+                  <li className="flex items-start gap-2 text-sm text-gray-700 font-medium"><CheckCircle2 size={16} className="text-accent shrink-0 mt-0.5"/> Custom Domain Mapping</li>
+                  <li className="flex items-start gap-2 text-sm text-gray-700 font-medium"><CheckCircle2 size={16} className="text-accent shrink-0 mt-0.5"/> Hands-free Onboarding</li>
+                </ul>
+                <button className="w-full py-3 rounded-xl font-bold bg-gray-100 text-navy hover:bg-gray-200 transition-colors">Request Setup</button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
