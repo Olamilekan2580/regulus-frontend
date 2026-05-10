@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
+import SubscriptionBanner from './components/SubscriptionBanner'; // <-- 1. New Import
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
@@ -39,7 +40,17 @@ export default function App() {
       />
       
       {/* 3. FULLY PROTECTED: Needs Auth + Org + Includes Sidebar */}
-      <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+      {/* 2. INJECTED BANNER ABOVE LAYOUT */}
+      <Route path="/" element={
+        <ProtectedRoute>
+          <div className="flex flex-col h-screen w-full overflow-hidden">
+            <SubscriptionBanner />
+            <div className="flex-1 overflow-hidden">
+              <Layout />
+            </div>
+          </div>
+        </ProtectedRoute>
+      }>
         <Route index element={<Dashboard />} />
         <Route path="clients" element={<Clients />} />
         <Route path="projects" element={<Projects />} />
