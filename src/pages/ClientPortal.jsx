@@ -1,8 +1,17 @@
+/**
+ * @fileoverview Client Collaboration & Payment Portal
+ * @architecture Secure Token Routing, Centralized API Interceptor, Optimistic UI
+ * * CRITICAL FIXES APPLIED:
+ * - Solves Issue #24: Stripped raw `axios`. Now uses the central `api` instance for error handling and interceptors.
+ * - Solves Issue #3: Rerouted the initialization fetch to `/portal/${token}` instead of the broken `/public/` route.
+ * - Cleaned up the Stripe session verification and payment gateways.
+ */
+
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { CheckCircle, FileText, FileSignature, CreditCard, Clock } from 'lucide-react';
 import { usePaystackPayment } from 'react-paystack';
-import axios from 'axios';
+import api from '../lib/api'; // 🔒 THE FIX: Centralized Interceptor
 
 // ==========================================
 // 1. DYNAMIC INVOICE CHECKOUT COMPONENT
@@ -10,15 +19,19 @@ import axios from 'axios';
 const PayButton = ({ invoice, client, settings, onPaymentSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
 
-  if (invoice.status === 'Paid') return <span className="px-3 py-1 bg-green-100 text-green-700 rounded text-xs font-bold shadow-sm border border-green-200">Paid</span>;
+  if (invoice.status === 'Paid') {
+    return <span className="px-3 py-1 bg-green-100 text-green-700 rounded text-xs font-bold shadow-sm border border-green-200">Paid</span>;
+  }
 
   const handleStripe = async () => {
     setIsLoading(true);
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/public/invoices/${invoice.id}/stripe-checkout`);
+      // 🔒 Uses centralized API instance
+      const res = await api.post(`/public/invoices/${invoice.id}/stripe-checkout`);
       window.location.href = res.data.url; 
     } catch (err) {
       alert(err.response?.data?.error || 'Payment failed to initialize.');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -27,16 +40,21 @@ const PayButton = ({ invoice, client, settings, onPaymentSuccess }) => {
     reference: `INV_${(new Date()).getTime().toString()}`,
     email: client.email || 'billing@client.com',
     amount: Math.round(parseFloat(invoice.total) * 100),
-    currency: invoice.currency || 'USD', // Adjust for NGN if needed
-    publicKey: settings.paystack_public_key || '',
+    currency: invoice.currency || 'USD',
+    publicKey: settings?.paystack_public_key || '',
   };
   const initializePaystack = usePaystackPayment(paystackConfig);
 
-  if (!settings.provider) return <span className="text-xs text-red-500 font-bold">Gateway Not Configured</span>;
+  if (!settings?.provider) return <span className="text-xs text-red-500 font-bold">Gateway Not Configured</span>;
 
   if (settings.provider === 'stripe') {
     return (
-      <button onClick={handleStripe} disabled={isLoading} style={{ backgroundColor: settings.brand_color || '#1E293B' }} className="flex items-center gap-2 text-white px-5 py-2.5 rounded-xl text-sm hover:shadow-lg transition-all active:scale-95 font-bold shadow-sm disabled:opacity-50">
+      <button 
+        onClick={handleStripe} 
+        disabled={isLoading} 
+        style={{ backgroundColor: settings.brand_color || '#1E293B' }} 
+        className="flex items-center gap-2 text-white px-5 py-2.5 rounded-xl text-sm hover:shadow-lg transition-all active:scale-95 font-bold shadow-sm disabled:opacity-50"
+      >
         <CreditCard size={18} /> {isLoading ? 'Connecting...' : 'Pay with Stripe'}
       </button>
     );
@@ -45,7 +63,14 @@ const PayButton = ({ invoice, client, settings, onPaymentSuccess }) => {
   if (settings.provider === 'paystack') {
     if (!settings.paystack_public_key) return <span className="text-xs text-red-500 font-bold">Missing Paystack Key</span>;
     return (
-      <button onClick={() => initializePaystack({ onSuccess: (transaction) => onPaymentSuccess(invoice.id, transaction.reference, 'paystack', 'invoice'), onClose: () => {} })} style={{ backgroundColor: settings.brand_color || '#1E293B' }} className="flex items-center gap-2 text-white px-5 py-2.5 rounded-xl text-sm hover:shadow-lg transition-all active:scale-95 font-bold shadow-sm">
+      <button 
+        onClick={() => initializePaystack({ 
+          onSuccess: (transaction) => onPaymentSuccess(invoice.id, transaction.reference, 'paystack', 'invoice'), 
+          onClose: () => {} 
+        })} 
+        style={{ backgroundColor: settings.brand_color || '#1E293B' }} 
+        className="flex items-center gap-2 text-white px-5 py-2.5 rounded-xl text-sm hover:shadow-lg transition-all active:scale-95 font-bold shadow-sm"
+      >
         <CreditCard size={18} /> Pay with Paystack
       </button>
     );
@@ -64,11 +89,11 @@ const ProposalPayButton = ({ proposal, client, settings, onPaymentSuccess, onDec
   const handleStripe = async () => {
     setIsLoading(true);
     try {
-      // Hits the public Stripe endpoint for Proposals
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/public/proposals/${proposal.id}/stripe-checkout`);
+      const res = await api.post(`/public/proposals/${proposal.id}/stripe-checkout`);
       window.location.href = res.data.url; 
     } catch (err) {
       alert(err.response?.data?.error || 'Payment failed to initialize.');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -77,8 +102,8 @@ const ProposalPayButton = ({ proposal, client, settings, onPaymentSuccess, onDec
     reference: `PROP_${(new Date()).getTime().toString()}`,
     email: client.email || 'billing@client.com',
     amount: Math.round(parseFloat(proposal.price) * 100),
-    currency: 'USD', // Adjust this if your freelancers bill in NGN
-    publicKey: settings.paystack_public_key || '',
+    currency: 'USD', 
+    publicKey: settings?.paystack_public_key || '',
   };
   const initializePaystack = usePaystackPayment(paystackConfig);
 
@@ -90,25 +115,40 @@ const ProposalPayButton = ({ proposal, client, settings, onPaymentSuccess, onDec
 
   return (
     <div className="flex gap-4 mt-8">
-      {settings.provider === 'stripe' && (
-        <button onClick={handleStripe} disabled={isLoading || isDeclining} className="flex-1 bg-green-500 text-white py-4 rounded-xl font-bold hover:bg-green-600 transition-colors shadow-sm disabled:opacity-50 hover:shadow-lg hover:shadow-green-500/20 active:scale-95 flex justify-center items-center gap-2">
+      {settings?.provider === 'stripe' && (
+        <button 
+          onClick={handleStripe} 
+          disabled={isLoading || isDeclining} 
+          className="flex-1 bg-green-500 text-white py-4 rounded-xl font-bold hover:bg-green-600 transition-colors shadow-sm disabled:opacity-50 hover:shadow-lg hover:shadow-green-500/20 active:scale-95 flex justify-center items-center gap-2"
+        >
           <CreditCard size={20} /> {isLoading ? 'Connecting...' : 'Approve & Pay Deposit (Stripe)'}
         </button>
       )}
 
-      {settings.provider === 'paystack' && (
-        <button onClick={() => initializePaystack({ onSuccess: (transaction) => onPaymentSuccess(proposal.id, transaction.reference, 'paystack', 'proposal'), onClose: () => {} })} disabled={isLoading || isDeclining} className="flex-1 bg-green-500 text-white py-4 rounded-xl font-bold hover:bg-green-600 transition-colors shadow-sm disabled:opacity-50 hover:shadow-lg hover:shadow-green-500/20 active:scale-95 flex justify-center items-center gap-2">
+      {settings?.provider === 'paystack' && (
+        <button 
+          onClick={() => initializePaystack({ 
+            onSuccess: (transaction) => onPaymentSuccess(proposal.id, transaction.reference, 'paystack', 'proposal'), 
+            onClose: () => {} 
+          })} 
+          disabled={isLoading || isDeclining} 
+          className="flex-1 bg-green-500 text-white py-4 rounded-xl font-bold hover:bg-green-600 transition-colors shadow-sm disabled:opacity-50 hover:shadow-lg hover:shadow-green-500/20 active:scale-95 flex justify-center items-center gap-2"
+        >
           <CreditCard size={20} /> {isLoading ? 'Processing...' : 'Approve & Pay Deposit (Paystack)'}
         </button>
       )}
 
-      {!settings.provider && (
+      {!settings?.provider && (
         <div className="flex-1 bg-red-50 text-red-500 py-4 rounded-xl font-bold border border-red-100 flex justify-center items-center">
           Payment Gateway Not Configured
         </div>
       )}
 
-      <button onClick={handleDecline} disabled={isLoading || isDeclining} className="px-8 py-4 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors disabled:opacity-50 active:scale-95">
+      <button 
+        onClick={handleDecline} 
+        disabled={isLoading || isDeclining} 
+        className="px-8 py-4 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors disabled:opacity-50 active:scale-95"
+      >
         {isDeclining ? 'Declining...' : 'Decline'}
       </button>
     </div>
@@ -124,20 +164,26 @@ export default function ClientPortal() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState(null);
 
+  // 1. Initial Load via Central API
   useEffect(() => {
-    axios.get(`${import.meta.env.VITE_API_URL}/public/portal/${token}`)
-      .then(res => setData(res.data)).catch(() => setData('error'));
+    // 🔒 THE FIX (Issue #3): Hits the mounted token route, not the UUID route.
+    api.get(`/portal/${token}`)
+      .then(res => setData(res.data))
+      .catch((err) => {
+        console.error('[Portal Auth Error]:', err.message);
+        setData('error');
+      });
   }, [token]);
 
-  // Stripe Redirect Catcher
+  // 2. Stripe Redirect Catcher
   useEffect(() => {
     const success = searchParams.get('success');
     const invoiceId = searchParams.get('invoice_id');
     const proposalId = searchParams.get('proposal_id');
     const sessionId = searchParams.get('session_id');
 
-    if (success === 'true' && sessionId && data) {
-      setSearchParams({});
+    if (success === 'true' && sessionId && data && data !== 'error') {
+      setSearchParams({}); // Clear URL params
       if (invoiceId) {
         handlePaymentSuccess(invoiceId, sessionId, 'stripe', 'invoice');
       } else if (proposalId) {
@@ -148,19 +194,19 @@ export default function ClientPortal() {
 
   const handleDeclineProposal = async (proposalId, newStatus) => {
     try {
-      await axios.put(`${import.meta.env.VITE_API_URL}/public/proposals/${proposalId}/status`, { status: newStatus });
+      await api.put(`/public/proposals/${proposalId}/status`, { status: newStatus });
       setData(prev => ({
         ...prev,
         proposals: prev.proposals.map(p => p.id === proposalId ? { ...p, status: newStatus } : p)
       }));
     } catch (err) {
-      alert('Failed to update proposal status.');
+      alert('Failed to update proposal status. Please contact the agency.');
     }
   };
 
   const handlePaymentSuccess = async (id, transactionId, provider, type = 'invoice') => {
     try {
-      // Optimistic UI Update based on document type
+      // Optimistic UI Update
       if (type === 'invoice') {
         setData(prev => ({
           ...prev,
@@ -173,21 +219,21 @@ export default function ClientPortal() {
         }));
       }
 
-      // Background Verification Route
+      // Background Verification Route via API Instance
       const route = provider === 'stripe' ? 'verify-stripe' : 'verify-paystack';
       const endpoint = type === 'invoice' ? `/public/invoices/${id}/${route}` : `/public/proposals/${id}/${route}`;
       const payload = provider === 'stripe' ? { session_id: transactionId } : { reference: transactionId };
 
-      await axios.post(`${import.meta.env.VITE_API_URL}${endpoint}`, payload);
+      await api.post(endpoint, payload);
     } catch (err) {
-      console.error('Payment verification warning:', err);
+      console.error('[Payment Verification Warning]:', err.message);
     }
   };
 
   if (!data) return <div className="min-h-screen flex items-center justify-center text-gray-500 font-medium">Loading secure portal...</div>;
   if (data === 'error') return <div className="min-h-screen flex items-center justify-center text-red-500 font-medium">Invalid or expired secure link.</div>;
 
-  const { client, projects = [], invoices = [], proposals = [], settings } = data;
+  const { client, projects = [], invoices = [], proposals = [], settings = {} } = data;
 
   return (
     <div className="min-h-screen bg-gray-50/50 py-12 px-4">
@@ -197,7 +243,7 @@ export default function ClientPortal() {
         <div className="flex justify-between items-end border-b border-gray-200 pb-6">
           <div>
             <h1 className="text-3xl font-black tracking-tight" style={{ color: settings.brand_color || '#1E293B' }}>
-              {client.company || client.name}
+              {client?.company || client?.name || 'Client Portal'}
             </h1>
             <p className="text-gray-500 mt-1 font-bold uppercase tracking-widest text-xs">Client Collaboration Portal</p>
           </div>

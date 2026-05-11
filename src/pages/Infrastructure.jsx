@@ -19,14 +19,16 @@ export default function Infrastructure() {
   const [status, setStatus] = useState('idle'); 
 
   useEffect(() => {
-    // CRITICAL: Ensure we only fetch projects belonging to THIS organization
-    const orgId = localStorage.getItem('current_org_id');
-    if (!orgId) return;
-
-    api.get(`/projects?org_id=${orgId}`)
+    // 1. URL Leak Fixed (Issue #16): We removed ?org_id=...
+    // The api.js interceptor will automatically attach the 'x-org-id' header securely.
+    // 2. We request limit=100 to ensure the dropdown populates fully.
+    api.get('/projects?limit=100')
       .then(res => {
-        // Filter out completed projects
-        setProjects(res.data.filter(p => p.status !== 'Completed'));
+        // 3. The Crash Fix: Accommodate the new Enterprise backend response schema { data, meta }
+        const projectsList = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+        
+        // Filter out completed or archived projects so we only provision active ones
+        setProjects(projectsList.filter(p => p.status !== 'Completed' && p.status !== 'Archived'));
       })
       .catch(err => console.error('[Infra Project Fetch Error]:', err));
   }, []);
@@ -37,10 +39,9 @@ export default function Infrastructure() {
 
   const handleProvision = async (e) => {
     e.preventDefault();
-    const orgId = localStorage.getItem('current_org_id');
-
-    if (!selectedProject || !repoName || !orgId) {
-      addLog('Missing workspace context or project selection.', 'error');
+    
+    if (!selectedProject || !repoName) {
+      addLog('Missing required deployment parameters.', 'error');
       return;
     }
 
@@ -51,9 +52,8 @@ export default function Infrastructure() {
     addLog('Initializing DevSecOps pipeline...', 'info');
 
     try {
-      // UPGRADE: Passing org_id to ensure the backend can verify ownership
+      // We no longer send org_id in the body. The backend relies purely on the secure header.
       await api.post('/infrastructure/provision', {
-        org_id: orgId, // <--- Mandatory for Multi-tenancy
         project_id: selectedProject,
         stack_template: selectedStack,
         repo_name: repoName
@@ -72,9 +72,8 @@ export default function Infrastructure() {
       }, 7000);
 
     } catch (err) {
-      // This catches the "Project not found or access denied" error from your backend
       const errorMsg = err.response?.data?.error || 'Pipeline execution failed.';
-      addLog(errorMsg, 'error');
+      addLog(`[FATAL] ${errorMsg}`, 'error');
       setStatus('error');
       setIsProvisioning(false);
     }

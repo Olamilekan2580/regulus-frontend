@@ -57,8 +57,11 @@ export default function Settings() {
           if (pay.paystack_pk) setPaystackPk(pay.paystack_pk);
           if (pay.paystack_sk) setPaystackSk(pay.paystack_sk);
 
-          // If they have ANY keys saved, lock the vault UI
-          if (pay.stripe_pk || pay.paystack_pk) {
+          // 🔒 THE FIX: Check for ANY key presence (Public or Secret) to trigger the lock
+          const hasStripe = Boolean(pay.stripe_pk || (pay.stripe_sk && pay.stripe_sk !== ''));
+          const hasPaystack = Boolean(pay.paystack_pk || (pay.paystack_sk && pay.paystack_sk !== ''));
+          
+          if (hasStripe || hasPaystack) {
             setIsEditingPayments(false);
           }
         }
@@ -97,7 +100,6 @@ export default function Settings() {
         paystack_pk: paystackPk, 
         paystack_sk: paystackSk 
       });
-      // Lock the vault upon successful save
       setIsEditingPayments(false);
     } catch (err) {
       alert('Failed to save payment settings.');
@@ -113,42 +115,38 @@ export default function Settings() {
       await api.delete(`/orgs/${orgId}/members/${userId}`);
       setMembers(members.filter(m => m.user_id !== userId));
     } catch (err) {
-      alert('Failed to remove member.');
+      alert(err.response?.data?.error || 'Failed to remove member.');
     }
   };
 
-  // ==========================================
-  // SUBSCRIPTION UPGRADE HANDLER
-  // ==========================================
   const handlePlanSelection = async (tier) => {
-  setIsProcessingUpgrade(true);
-  try {
-    // 1. Request a real checkout session from your backend
-    const res = await api.post('/billing/create-checkout-session', { 
-      plan_tier: tier, 
-      org_id: orgId 
-    });
+    setIsProcessingUpgrade(true);
+    try {
+      const res = await api.post('/billing/create-checkout-session', { 
+        plan_tier: tier, 
+        org_id: orgId 
+      });
 
-    // 2. Redirect the user to the Stripe-hosted checkout page
-    if (res.data?.url) {
-      window.location.href = res.data.url;
-    } else {
-      throw new Error('No checkout URL received.');
+      if (res.data?.url) {
+        window.location.href = res.data.url;
+      } else {
+        throw new Error('No checkout URL received.');
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || 'Checkout failed to initialize.');
+    } finally {
+      setIsProcessingUpgrade(false);
     }
-  } catch (err) {
-    alert(err.response?.data?.error || 'Checkout failed to initialize.');
-  } finally {
-    setIsProcessingUpgrade(false);
-  }
-};
+  };
 
-  // Utility to mask API keys
   const maskKey = (key) => {
     if (!key) return 'Not Configured';
     return key.substring(0, 8) + '••••••••••••••••' + key.slice(-4);
   };
 
   if (isLoading) return <div className="flex justify-center p-12"><div className="animate-spin w-8 h-8 border-2 border-navy border-t-transparent rounded-full"></div></div>;
+
+  const isAdminOrOwner = ['owner', 'admin'].includes(orgData?.role);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-12">
@@ -170,24 +168,89 @@ export default function Settings() {
       <div className="grid gap-6">
         
         {/* BILLING & SUBSCRIPTION SECTION */}
-        <section className="bg-gradient-to-br from-navy to-[#1a233a] rounded-2xl p-8 border border-gray-800 shadow-xl text-white relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-            <Crown size={120} />
-          </div>
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-[10px] font-black text-accent uppercase tracking-widest bg-accent/10 px-2 py-1 rounded border border-accent/20">Current Plan</span>
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{orgData?.subscription_status || 'Trialing'}</span>
+        {isAdminOrOwner && (
+          <section className="bg-gradient-to-br from-navy to-[#1a233a] rounded-2xl p-8 border border-gray-800 shadow-xl text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+              <Crown size={120} />
+            </div>
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[10px] font-black text-accent uppercase tracking-widest bg-accent/10 px-2 py-1 rounded border border-accent/20">Current Plan</span>
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{orgData?.subscription_status || 'Trialing'}</span>
+                </div>
+                <h2 className="text-3xl font-black text-white capitalize">{orgData?.plan_tier || 'Solo'} Tier</h2>
+                <p className="text-sm text-gray-400 font-medium mt-2 max-w-md">Upgrade to Agency to unlock unlimited team members and remove white-labeling restrictions.</p>
               </div>
-              <h2 className="text-3xl font-black text-white capitalize">{orgData?.plan_tier || 'Solo'} Tier</h2>
-              <p className="text-sm text-gray-400 font-medium mt-2 max-w-md">Upgrade to Agency to unlock unlimited team members and remove white-labeling restrictions.</p>
+              <div className="shrink-0">
+                <button onClick={() => setShowPricingModal(true)} className="bg-accent text-navy px-8 py-3 rounded-xl font-bold hover:bg-accent/90 transition-all shadow-[0_0_20px_rgba(0,200,150,0.3)] active:scale-95">
+                  Upgrade Workspace
+                </button>
+              </div>
             </div>
-            <div className="shrink-0">
-              <button onClick={() => setShowPricingModal(true)} className="bg-accent text-navy px-8 py-3 rounded-xl font-bold hover:bg-accent/90 transition-all shadow-[0_0_20px_rgba(0,200,150,0.3)] active:scale-95">
-                Upgrade Workspace
+          </section>
+        )}
+
+        {/* ISSUE #22 FIXED: TEAM DIRECTORY SECTION */}
+        <section className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><Users size={20} /></div>
+              <div>
+                <h2 className="text-xl font-bold text-navy">Team Directory</h2>
+                <p className="text-sm text-gray-500 font-medium mt-1">Manage workspace access and member roles.</p>
+              </div>
+            </div>
+            {isAdminOrOwner && (
+              <button 
+                onClick={() => setShowInviteModal(true)} 
+                className="flex items-center gap-2 bg-navy text-white px-4 py-2 rounded-lg font-medium hover:bg-navy/90 transition-colors text-sm"
+              >
+                <Users size={16} /> Invite Member
               </button>
-            </div>
+            )}
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-widest">
+                  <th className="py-3 font-black">User Email</th>
+                  <th className="py-3 font-black">Assigned Role</th>
+                  <th className="py-3 font-black text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {members.map(member => (
+                  <tr key={member.user_id} className="group hover:bg-gray-50/50 transition-colors">
+                    <td className="py-4 text-sm font-bold text-navy">{member.email}</td>
+                    <td className="py-4">
+                      <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md ${
+                        member.role === 'owner' ? 'bg-purple-100 text-purple-700' :
+                        member.role === 'admin' ? 'bg-blue-100 text-blue-700' :
+                        'bg-gray-100 text-gray-600'
+                      }`}>
+                        {member.role}
+                      </span>
+                    </td>
+                    <td className="py-4 text-right">
+                      {isAdminOrOwner && member.role !== 'owner' && (
+                        <button 
+                          onClick={() => handleRemoveMember(member.user_id, member.role)} 
+                          className="text-gray-300 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-50"
+                          title="Revoke Access"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {members.length === 0 && (
+              <div className="text-center py-8 text-sm text-gray-400 font-medium">No team members found.</div>
+            )}
           </div>
         </section>
 
@@ -201,14 +264,14 @@ export default function Settings() {
                 <p className="text-sm text-gray-500 font-medium mt-1">Connect your preferred processor to get paid directly.</p>
               </div>
             </div>
-            {!isEditingPayments && (
+            {(!isEditingPayments && isAdminOrOwner) && (
               <button onClick={() => setIsEditingPayments(true)} className="flex items-center gap-1.5 text-xs font-bold text-navy hover:text-accent transition-colors bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
                 <Edit2 size={14} /> Update Keys
               </button>
             )}
           </div>
           
-          {isEditingPayments ? (
+          {isEditingPayments && isAdminOrOwner ? (
             <div className="space-y-6 animate-in fade-in duration-300">
               <div>
                 <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Active Gateway</label>
@@ -254,7 +317,7 @@ export default function Settings() {
               </div>
             </div>
           ) : (
-            // LOCKED VIEW
+            // LOCKED VIEW (Also shown to non-admins as read-only)
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in duration-300">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center font-black text-navy text-xl uppercase">
@@ -294,26 +357,28 @@ export default function Settings() {
             <div>
               <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Primary Brand Color</label>
               <div className="flex items-center gap-4">
-                <input type="color" value={navyColor} onChange={(e) => setNavyColor(e.target.value)} className="w-12 h-12 rounded cursor-pointer border-0 p-0 bg-transparent" />
-                <input type="text" value={navyColor} onChange={(e) => setNavyColor(e.target.value)} className="font-mono text-sm font-bold border border-gray-200 p-2.5 rounded-lg w-full uppercase outline-none focus:border-accent transition-colors" />
+                <input type="color" disabled={!isAdminOrOwner} value={navyColor} onChange={(e) => setNavyColor(e.target.value)} className={`w-12 h-12 rounded border-0 p-0 bg-transparent ${isAdminOrOwner ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`} />
+                <input type="text" disabled={!isAdminOrOwner} value={navyColor} onChange={(e) => setNavyColor(e.target.value)} className="font-mono text-sm font-bold border border-gray-200 p-2.5 rounded-lg w-full uppercase outline-none focus:border-accent transition-colors disabled:bg-gray-50" />
               </div>
             </div>
             
             <div>
               <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Accent Color</label>
               <div className="flex items-center gap-4">
-                <input type="color" value={accentColor} onChange={(e) => setAccentColor(e.target.value)} className="w-12 h-12 rounded cursor-pointer border-0 p-0 bg-transparent" />
-                <input type="text" value={accentColor} onChange={(e) => setAccentColor(e.target.value)} className="font-mono text-sm font-bold border border-gray-200 p-2.5 rounded-lg w-full uppercase outline-none focus:border-accent transition-colors" />
+                <input type="color" disabled={!isAdminOrOwner} value={accentColor} onChange={(e) => setAccentColor(e.target.value)} className={`w-12 h-12 rounded border-0 p-0 bg-transparent ${isAdminOrOwner ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`} />
+                <input type="text" disabled={!isAdminOrOwner} value={accentColor} onChange={(e) => setAccentColor(e.target.value)} className="font-mono text-sm font-bold border border-gray-200 p-2.5 rounded-lg w-full uppercase outline-none focus:border-accent transition-colors disabled:bg-gray-50" />
               </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between border-t border-gray-50 pt-6">
-            <p className="text-xs text-gray-400 font-medium max-w-[250px]">Applies globally to UI and invoices.</p>
-            <button onClick={handleSaveBranding} disabled={isSavingTheme} className="px-6 py-2.5 bg-navy text-white font-bold rounded-xl hover:shadow-lg hover:shadow-navy/20 transition-all active:scale-95 disabled:opacity-50">
-              {isSavingTheme ? 'Applying...' : 'Apply Theme'}
-            </button>
-          </div>
+          {isAdminOrOwner && (
+            <div className="flex items-center justify-between border-t border-gray-50 pt-6">
+              <p className="text-xs text-gray-400 font-medium max-w-[250px]">Applies globally to UI and invoices.</p>
+              <button onClick={handleSaveBranding} disabled={isSavingTheme} className="px-6 py-2.5 bg-navy text-white font-bold rounded-xl hover:shadow-lg hover:shadow-navy/20 transition-all active:scale-95 disabled:opacity-50">
+                {isSavingTheme ? 'Applying...' : 'Apply Theme'}
+              </button>
+            </div>
+          )}
         </section>
         
       </div>

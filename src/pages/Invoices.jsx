@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Receipt, Calendar, DollarSign, Download, CheckCircle, Trash2, PlusCircle, AlertCircle } from 'lucide-react';
-import html2pdf from 'html2pdf.js';
+import { Plus, Receipt, Calendar, DollarSign, Download, Trash2, PlusCircle, AlertCircle } from 'lucide-react';
 import api from '../lib/api';
 
 const currencySymbols = {
@@ -97,7 +96,7 @@ export default function Invoices() {
     try {
       const finalTotal = calculateTotal();
       
-      // CRITICAL: Inject org_id into the payload
+      // Submit fully calculated payload to the secure backend route
       await api.post('/invoices', { 
         ...formData, 
         org_id: orgId, 
@@ -129,94 +128,38 @@ export default function Invoices() {
       setInvoices(invoices.map(inv => inv.id === id ? { ...inv, status: newStatus } : inv));
     } catch (err) {
       console.error('Failed to update status');
-      fetchData(); 
+      fetchData(); // Revert optimistic update on failure
     }
   };
 
+  // ARCHITECT FIX: Stripped html2pdf. Now calls the Puppeteer Server endpoint.
   const handleDownload = async (invoice) => {
     setDownloadingId(invoice.id);
-    const symbol = currencySymbols[invoice.currency] || '$';
     
     try {
+      // responseType 'blob' is required to handle raw binary PDF streams
+      const response = await api.get(`/invoices/${invoice.id}/pdf`, {
+        responseType: 'blob' 
+      });
+
       const clientData = getClientDetails(invoice.client_id);
-      const dateIssued = new Date(invoice.created_at || Date.now()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-      const dueDate = invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Upon receipt';
+      const safeClientName = clientData.name.replace(/\s+/g, '_');
+      const filename = `${invoice.invoice_number}_${safeClientName}.pdf`;
 
-      const watermark = invoice.status === 'Paid' 
-        ? `<div style="position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 150px; font-weight: 900; color: rgba(0, 200, 150, 0.08); z-index: 0; pointer-events: none; letter-spacing: 15px;">PAID</div>` 
-        : '';
-
-      const itemsHtml = (invoice.line_items || []).map(item => `
-        <tr>
-          <td style="padding: 24px 16px; border-bottom: 1px solid #f1f5f9; font-size: 15px;">${item.description || 'Service'}</td>
-          <td style="padding: 24px 16px; border-bottom: 1px solid #f1f5f9; font-size: 15px; text-align: center;">${item.quantity}</td>
-          <td style="padding: 24px 16px; border-bottom: 1px solid #f1f5f9; font-size: 15px; text-align: right;">${symbol}${parseFloat(item.rate).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-          <td style="padding: 24px 16px; border-bottom: 1px solid #f1f5f9; font-size: 15px; font-weight: 600; text-align: right;">${symbol}${(item.quantity * item.rate).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-        </tr>
-      `).join('');
-
-      const htmlContent = `
-        <div style="font-family: 'Inter', system-ui, sans-serif; padding: 60px; color: #0A0F1E; background: white; min-height: 1056px; position: relative;">
-          ${watermark}
-          <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #f8fafc; padding-bottom: 32px; position: relative; z-index: 1;">
-            <div>
-              <div style="font-size: 32px; font-weight: 900; color: #0A0F1E;">Regulus.</div>
-              <div style="font-size: 13px; color: #64748b; margin-top: 4px;">High-Performance Architecture</div>
-            </div>
-            <div style="text-align: right">
-              <div style="font-size: 24px; font-weight: 800; color: #e2e8f0; text-transform: uppercase;">Invoice</div>
-              <div style="font-size: 16px; font-weight: 600;">${invoice.invoice_number}</div>
-            </div>
-          </div>
-
-          <div style="margin-top: 48px; display: flex; justify-content: space-between; position: relative; z-index: 1;">
-            <div>
-              <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #94a3b8; margin-bottom: 12px;">Billed To</div>
-              <div style="font-weight: 700; font-size: 18px;">${clientData.name}</div>
-              <div style="color: #64748b; font-size: 14px;">${clientData.email}</div>
-            </div>
-            <div style="text-align: right">
-              <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #94a3b8; margin-bottom: 8px;">Date Issued</div>
-              <div style="font-weight: 600; font-size: 14px; margin-bottom: 16px;">${dateIssued}</div>
-              <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #94a3b8; margin-bottom: 8px;">Due Date</div>
-              <div style="font-weight: 600; font-size: 14px;">${dueDate}</div>
-            </div>
-          </div>
-
-          <table style="width: 100%; margin-top: 64px; border-collapse: collapse; position: relative; z-index: 1;">
-            <thead>
-              <tr style="background: #f8fafc;">
-                <th style="text-align: left; padding: 16px; font-size: 12px; color: #64748b; text-transform: uppercase;">Description</th>
-                <th style="text-align: center; padding: 16px; font-size: 12px; color: #64748b; text-transform: uppercase;">Qty / Hrs</th>
-                <th style="text-align: right; padding: 16px; font-size: 12px; color: #64748b; text-transform: uppercase;">Rate</th>
-                <th style="text-align: right; padding: 16px; font-size: 12px; color: #64748b; text-transform: uppercase;">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemsHtml}
-            </tbody>
-          </table>
-
-          <div style="margin-top: 48px; text-align: right; background: #f8fafc; padding: 32px; border-radius: 16px; float: right; min-width: 300px; position: relative; z-index: 1;">
-            <div style="font-size: 12px; text-transform: uppercase; font-weight: 800; color: #94a3b8;">Total Amount Due</div>
-            <div style="font-size: 36px; font-weight: 900; color: #0A0F1E; margin-top: 8px;">${symbol}${parseFloat(invoice.total).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-          </div>
-        </div>
-      `;
-
-      const opt = {
-        margin: 0,
-        filename: `${invoice.invoice_number}_${clientData.name.replace(/\s+/g, '_')}.pdf`,
-        image: { type: 'jpeg', quality: 1 },
-        html2canvas: { scale: 3, useCORS: true },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-      };
-
-      await html2pdf().set(opt).from(htmlContent).save();
-
+      // Create a secure memory link and trigger the browser download
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up the DOM and memory
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('PDF Generation Failed:', err);
-      alert('Local PDF generation failed.');
+      console.error('PDF Download Failed:', err);
+      alert('Server failed to generate the PDF document. Check backend logs.');
     } finally {
       setDownloadingId(null);
     }
@@ -271,7 +214,7 @@ export default function Invoices() {
                   <select 
                     value={invoice.status}
                     onChange={(e) => updateStatus(invoice.id, e.target.value)}
-                    className={`text-xs px-3 py-1.5 rounded-full font-bold border transition-all cursor-pointer outline-none appearance-none ${statusColors[invoice.status]}`}
+                    className={`text-xs px-3 py-1.5 rounded-full font-bold border transition-all cursor-pointer outline-none appearance-none ${statusColors[invoice.status] || statusColors['Draft']}`}
                   >
                     <option value="Draft">Draft</option>
                     <option value="Sent">Sent</option>
