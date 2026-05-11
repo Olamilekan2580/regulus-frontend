@@ -122,7 +122,8 @@ export default function Settings() {
   const handlePlanSelection = async (tier) => {
     setIsProcessingUpgrade(true);
     try {
-      const res = await api.post('/billing/create-checkout-session', { 
+      // 🔒 THE FIX: Pointing to the correct backend endpoint
+      const res = await api.post('/billing/subscribe', { 
         plan_tier: tier, 
         org_id: orgId 
       });
