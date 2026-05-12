@@ -27,14 +27,22 @@ export default function Projects() {
         api.get('/projects'),
         api.get('/clients')
       ]);
-      setProjects(projRes.data || []);
-      setClients(clientRes.data || []);
       
-      if (clientRes.data.length > 0) {
-        setFormData(prev => ({ ...prev, client_id: clientRes.data[0].id }));
+      // THE FIX: Force the data to be an array. If the API returns an error object, fallback to empty array [] so .map() never crashes.
+      const safeProjects = Array.isArray(projRes.data) ? projRes.data : (projRes.data?.data || []);
+      const safeClients = Array.isArray(clientRes.data) ? clientRes.data : (clientRes.data?.data || []);
+      
+      setProjects(safeProjects);
+      setClients(safeClients);
+      
+      if (safeClients.length > 0) {
+        setFormData(prev => ({ ...prev, client_id: safeClients[0].id }));
       }
     } catch (err) {
       console.error('Failed to fetch data:', err);
+      // Ensure we still set arrays on network failure to prevent crash
+      setProjects([]);
+      setClients([]);
     } finally {
       setLoading(false);
     }
