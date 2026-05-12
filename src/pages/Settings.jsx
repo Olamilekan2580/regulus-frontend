@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Palette, Trash2, ShieldAlert, CreditCard, Copy, Crown, Lock, Edit2, CheckCircle2, Zap } from 'lucide-react';
+import { Users, Palette, Trash2, ShieldAlert, CreditCard, Copy, Crown, Lock, Edit2, CheckCircle2, Zap, Github } from 'lucide-react';
 import InviteModal from '../components/InviteModal';
 import api from '../lib/api';
 
@@ -24,6 +24,10 @@ export default function Settings() {
   const [isSavingPayments, setIsSavingPayments] = useState(false);
   const [isProcessingUpgrade, setIsProcessingUpgrade] = useState(false);
   
+  // Developer Integration States
+  const [githubHandle, setGithubHandle] = useState('');
+  const [isSavingGithub, setIsSavingGithub] = useState(false);
+
   // UI Lock State
   const [isEditingPayments, setIsEditingPayments] = useState(true);
 
@@ -41,6 +45,11 @@ export default function Settings() {
         
         const data = brandRes.data;
         setOrgData(data);
+
+        // Load GitHub Handle
+        if (data?.github_handle) {
+          setGithubHandle(data.github_handle);
+        }
         
         if (data?.brand_settings) {
           const brand = typeof data.brand_settings === 'string' ? JSON.parse(data.brand_settings) : data.brand_settings;
@@ -105,6 +114,18 @@ export default function Settings() {
       alert('Failed to save payment settings.');
     } finally {
       setIsSavingPayments(false);
+    }
+  };
+
+  const handleSaveGithub = async () => {
+    setIsSavingGithub(true);
+    try {
+      await api.put(`/orgs/${orgId}/integrations`, { github_handle: githubHandle });
+      alert('GitHub handle saved successfully.');
+    } catch (err) {
+      alert('Failed to save GitHub integration.');
+    } finally {
+      setIsSavingGithub(false);
     }
   };
 
@@ -252,6 +273,44 @@ export default function Settings() {
             {members.length === 0 && (
               <div className="text-center py-8 text-sm text-gray-400 font-medium">No team members found.</div>
             )}
+          </div>
+        </section>
+
+        {/* DEVELOPER INTEGRATIONS */}
+        <section className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm mb-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-gray-100 text-gray-700 rounded-lg"><Github size={20} /></div>
+            <div>
+              <h2 className="text-xl font-bold text-navy">Developer Integrations</h2>
+              <p className="text-sm text-gray-500 font-medium mt-1">Connect external platforms for infrastructure provisioning.</p>
+            </div>
+          </div>
+          
+          <div className="max-w-md">
+            <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">GitHub Organization / User Handle</label>
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">github.com/</span>
+                <input 
+                  type="text" 
+                  disabled={!isAdminOrOwner}
+                  value={githubHandle} 
+                  onChange={(e) => setGithubHandle(e.target.value.replace(/[^a-zA-Z0-9-]/g, ''))} 
+                  placeholder="your-handle"
+                  className="w-full pl-28 p-3 bg-gray-50 border border-gray-200 rounded-xl font-mono text-sm outline-none focus:border-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+                />
+              </div>
+              {isAdminOrOwner && (
+                <button 
+                  onClick={handleSaveGithub} 
+                  disabled={isSavingGithub || !githubHandle}
+                  className="px-6 py-3 bg-navy text-white font-bold rounded-xl hover:bg-navy/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 shrink-0"
+                >
+                  {isSavingGithub ? 'Saving...' : 'Save'}
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 font-medium mt-3">This handle is used to dynamically route you to your provisioned repositories.</p>
           </div>
         </section>
 

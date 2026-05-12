@@ -1,7 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
-import TrialBanner from './components/TrialBanner'; // 1. We'll use this one
+import TrialBanner from './components/TrialBanner';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
@@ -24,13 +24,17 @@ import PublicTimeline from './pages/PublicTimeline';
 export default function App() {
   return (
     <Routes>
-      {/* PUBLIC ROUTES */}
+      {/* 🟢 PUBLIC ROUTES (No login required) */}
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/portal/:token" element={<ClientPortal />} />
       <Route path="/secret/:id" element={<SecretReveal />} />
       
-      {/* SEMI-PROTECTED (No Sidebar/Layout) */}
+      {/* 🔒 THE FIX: Moved these out of the Protected Route block */}
+      <Route path="/public/intake/:token" element={<PublicIntake />} />
+      <Route path="/public/updates/:token" element={<PublicTimeline />} />
+      
+      {/* 🟡 SEMI-PROTECTED (No Sidebar/Layout) */}
       <Route 
         path="/setup-workspace" 
         element={
@@ -40,11 +44,10 @@ export default function App() {
         } 
       />
       
-      {/* FULLY PROTECTED (The Main App) */}
+      {/* 🔴 FULLY PROTECTED (The Main App) */}
       <Route path="/" element={
         <ProtectedRoute>
           <div className="flex flex-col h-screen w-full overflow-hidden">
-            {/* The Trial Banner sits at the very top */}
             <TrialBanner /> 
             <div className="flex-1 overflow-hidden">
               <Layout />
@@ -52,7 +55,6 @@ export default function App() {
           </div>
         </ProtectedRoute>
       }>
-        {/* All these sub-pages render inside the Layout */}
         <Route index element={<Dashboard />} />
         <Route path="clients" element={<Clients />} />
         <Route path="projects" element={<Projects />} />
@@ -64,8 +66,6 @@ export default function App() {
         <Route path="join" element={<JoinOrg />} />
         <Route path="sandbox" element={<ContractSandbox />} />
         <Route path="vault" element={<Vault />} />
-        <Route path="/public/intake/:token" element={<PublicIntake />} />
-        <Route path="/public/updates/:token" element={<PublicTimeline />} />
       </Route>
 
       {/* Global 404 */}

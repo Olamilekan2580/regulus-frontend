@@ -14,23 +14,33 @@ export default function Infrastructure() {
   const [selectedStack, setSelectedStack] = useState(STACK_TEMPLATES[0].id);
   const [repoName, setRepoName] = useState('');
   
+  // Dynamic GitHub State
+  const [githubHandle, setGithubHandle] = useState('unconfigured');
+  
   const [isProvisioning, setIsProvisioning] = useState(false);
   const [logs, setLogs] = useState([]);
   const [status, setStatus] = useState('idle'); 
 
   useEffect(() => {
-    // 1. URL Leak Fixed (Issue #16): We removed ?org_id=...
-    // The api.js interceptor will automatically attach the 'x-org-id' header securely.
-    // 2. We request limit=100 to ensure the dropdown populates fully.
+    // Fetch Projects
     api.get('/projects?limit=100')
       .then(res => {
-        // 3. The Crash Fix: Accommodate the new Enterprise backend response schema { data, meta }
         const projectsList = Array.isArray(res.data) ? res.data : (res.data?.data || []);
-        
-        // Filter out completed or archived projects so we only provision active ones
         setProjects(projectsList.filter(p => p.status !== 'Completed' && p.status !== 'Archived'));
       })
       .catch(err => console.error('[Infra Project Fetch Error]:', err));
+
+    // Fetch Org Config for GitHub Handle
+    const orgId = localStorage.getItem('current_org_id');
+    if (orgId) {
+      api.get(`/orgs/${orgId}`)
+        .then(res => {
+          if (res.data?.github_handle) {
+            setGithubHandle(res.data.github_handle);
+          }
+        })
+        .catch(err => console.error('[Infra Org Fetch Error]:', err));
+    }
   }, []);
 
   const addLog = (msg, type = 'info') => {
@@ -52,14 +62,13 @@ export default function Infrastructure() {
     addLog('Initializing DevSecOps pipeline...', 'info');
 
     try {
-      // We no longer send org_id in the body. The backend relies purely on the secure header.
       await api.post('/infrastructure/provision', {
         project_id: selectedProject,
         stack_template: selectedStack,
         repo_name: repoName
       });
 
-      // Simulation logic (keeps the UI interactive while n8n works in bg)
+      // Simulation logic
       setTimeout(() => addLog('Authenticating with GitHub API...', 'info'), 800);
       setTimeout(() => addLog(`Created repository: ${repoName}`, 'success'), 1800);
       setTimeout(() => addLog('Provisioning database instance...', 'info'), 2800);
@@ -77,6 +86,14 @@ export default function Infrastructure() {
       setStatus('error');
       setIsProvisioning(false);
     }
+  };
+
+  const handleSourceCodeClick = () => {
+    if (githubHandle === 'unconfigured') {
+      alert('Please configure your GitHub handle in Settings first.');
+      return;
+    }
+    window.open(`https://github.com/${githubHandle}/${repoName}`, '_blank');
   };
 
   return (
@@ -217,9 +234,12 @@ export default function Infrastructure() {
               <div className="flex items-center gap-2 text-[#27C93F] font-bold text-xs uppercase tracking-wider">
                 <CheckCircle2 size={16} /> Environments Verified
               </div>
-              <a href={`https://github.com/your-username/${repoName}`} target="_blank" rel="noreferrer" className="text-[10px] font-black text-white bg-[#27C93F] px-3 py-1.5 rounded-md hover:bg-[#27C93F]/80 transition-all uppercase tracking-widest">
+              <button 
+                onClick={handleSourceCodeClick}
+                className="text-[10px] font-black text-white bg-[#27C93F] px-3 py-1.5 rounded-md hover:bg-[#27C93F]/80 transition-all uppercase tracking-widest"
+              >
                 Source Code →
-              </a>
+              </button>
             </div>
           )}
           

@@ -1,129 +1,96 @@
 import { useState, useEffect } from 'react';
-import { Plus, FileText, Send, Clock, FolderKanban, MoreVertical, Trash2, Edit2 } from 'lucide-react';
+import { Plus, FileText, Calendar, DollarSign, Building, MoreVertical, Send, CheckCircle, X } from 'lucide-react';
 import api from '../lib/api';
 
 export default function Proposals() {
   const [proposals, setProposals] = useState([]);
-  const [projects, setProjects] = useState([]);
+  const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [editingId, setEditingId] = useState(null);
-  const [activeDropdown, setActiveDropdown] = useState(null);
   
-  const [formData, setFormData] = useState({ 
-    project_id: '', 
+  const [formData, setFormData] = useState({
+    client_id: '',
     title: '',
-    description: '',
-    price: '', 
-    timeline: '' 
+    value: '',
+    status: 'Draft'
   });
 
   const fetchData = async () => {
     try {
-      const [propRes, projRes] = await Promise.all([
-        api.get('/proposals'), 
-        api.get('/projects')
+      const [propRes, clientRes] = await Promise.all([
+        api.get('/proposals'),
+        api.get('/clients')
       ]);
-      setProposals(propRes.data || []);
-      setProjects(projRes.data || []);
-      if (projRes.data.length > 0 && !formData.project_id) {
-        setFormData(prev => ({ ...prev, project_id: projRes.data[0].id }));
+      
+      // 🔒 THE FIX: Safe array fallback to prevent the .map() crash
+      const safeProposals = Array.isArray(propRes.data) ? propRes.data : (propRes.data?.data || []);
+      const safeClients = Array.isArray(clientRes.data) ? clientRes.data : (clientRes.data?.data || []);
+      
+      setProposals(safeProposals);
+      setClients(safeClients);
+      
+      if (safeClients.length > 0) {
+        setFormData(prev => ({ ...prev, client_id: safeClients[0].id }));
       }
-    } catch (err) { 
-      console.error(err); 
-    } finally { 
-      setLoading(false); 
+    } catch (err) {
+      console.error('[Proposals Fetch Error]:', err);
+      setProposals([]);
+      setClients([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (isSubmitting) return; 
-    
-    // CRITICAL: Get the Org Context
-    const orgId = localStorage.getItem('current_org_id');
-    if (!orgId) {
-      setError('Workspace context missing. Please refresh.');
-      return;
-    }
-
-    setIsSubmitting(true);
     setError('');
-    
-    // Prepare the payload with the Org ID
-    const payload = { 
-      ...formData, 
-      org_id: orgId, // Injecting the missing link
-      price: parseFloat(formData.price) 
-    };
-
     try {
-      if (editingId) {
-        await api.put(`/proposals/${editingId}`, payload);
-      } else {
-        await api.post('/proposals', payload);
-      }
-      
+      await api.post('/proposals', {
+        ...formData,
+        value: parseFloat(formData.value) || 0
+      });
       setIsModalOpen(false);
-      setEditingId(null);
-      setFormData({ project_id: projects[0]?.id || '', title: '', description: '', price: '', timeline: '' });
-      fetchData();
-    } catch (err) { 
-      console.error("Submission Error:", err.response?.data);
-      setError(editingId ? 'Failed to update proposal' : 'Failed to create proposal'); 
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this proposal?')) return;
-    try {
-      await api.delete(`/proposals/${id}`);
-      setActiveDropdown(null);
+      setFormData({
+        client_id: clients[0]?.id || '',
+        title: '',
+        value: '',
+        status: 'Draft'
+      });
       fetchData();
     } catch (err) {
-      console.error('Failed to delete:', err);
-      alert('Failed to delete proposal.');
+      setError(err.response?.data?.error || 'Failed to create proposal.');
     }
-  };
-
-  const copyToClipboard = (clientId) => {
-    if (!clientId) {
-      alert('Cannot copy link: No client attached to this project.');
-      return;
-    }
-    const url = `${window.location.origin}/portal/${clientId}`;
-    navigator.clipboard.writeText(url);
-    alert('Portal link copied to clipboard!');
   };
 
   const statusStyles = {
-    'Draft': 'bg-gray-100 text-gray-700 border-gray-200',
-    'Sent': 'bg-blue-50 text-blue-700 border-blue-200',
-    'Approved': 'bg-green-50 text-green-700 border-green-200',
-    'Rejected': 'bg-red-50 text-red-700 border-red-200'
+    'Draft': 'bg-gray-100 text-gray-600 border-gray-200',
+    'Sent': 'bg-blue-50 text-blue-600 border-blue-200',
+    'Accepted': 'bg-green-50 text-green-700 border-green-200',
+    'Declined': 'bg-red-50 text-red-600 border-red-200'
   };
 
   return (
-    <div className="space-y-8" onClick={() => setActiveDropdown(null)}>
+    <div className="space-y-8">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-navy tracking-tight">Proposals</h1>
-          <p className="text-sm text-gray-500 mt-1 font-medium">Draft and send project scopes</p>
+          <p className="text-sm text-gray-500 mt-1 font-medium">Draft and send scopes of work to win new business.</p>
         </div>
         <button 
-          onClick={(e) => { e.stopPropagation(); setIsModalOpen(true); }} 
+          onClick={() => setIsModalOpen(true)}
           className="flex items-center gap-2 bg-navy text-white px-5 py-2.5 rounded-lg hover:bg-navy/90 transition-all font-medium shadow-sm active:scale-95"
         >
-          <Plus size={18} strokeWidth={2.5} /> Create Proposal
+          <Plus size={18} strokeWidth={2.5} /> New Proposal
         </button>
       </div>
 
+      {/* Grid */}
       {loading ? (
         <div className="flex items-center justify-center p-12 text-gray-400">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-navy mr-3"></div>
@@ -136,154 +103,133 @@ export default function Proposals() {
               <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4 border border-gray-100">
                 <FileText size={28} className="text-gray-400" />
               </div>
-              <h3 className="text-xl font-bold text-navy mb-2">No proposals yet</h3>
-              <p className="text-gray-500 mb-6 max-w-md">Win your next big client. Draft your first project scope.</p>
+              <h3 className="text-xl font-bold text-navy mb-2">No active proposals</h3>
+              <p className="text-gray-500 mb-6 max-w-md">
+                You haven't drafted any proposals yet. Create one to pitch a new project to your clients.
+              </p>
               <button 
-                onClick={(e) => { e.stopPropagation(); setIsModalOpen(true); }} 
+                onClick={() => setIsModalOpen(true)}
                 className="flex items-center gap-2 bg-white text-navy border border-gray-200 px-6 py-2.5 rounded-lg font-medium shadow-sm hover:border-navy hover:text-navy transition-colors"
               >
-                <Plus size={18} /> Draft First Proposal
+                <Plus size={18} /> Create First Proposal
               </button>
             </div>
           ) : (
-            proposals.map(prop => (
-              <div key={prop.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group relative flex flex-col h-full">
-                <div className="absolute top-4 right-4 z-10">
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveDropdown(activeDropdown === prop.id ? null : prop.id);
-                    }}
-                    className="p-1.5 text-gray-400 hover:text-navy hover:bg-gray-100 rounded-md transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
-                  >
-                    <MoreVertical size={18} />
-                  </button>
+            proposals.map(proposal => (
+              <div key={proposal.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group relative flex flex-col h-full">
+                
+                {/* Settings menu trigger */}
+                <button className="absolute top-4 right-4 text-gray-300 hover:text-navy opacity-0 group-hover:opacity-100 transition-opacity">
+                  <MoreVertical size={18} />
+                </button>
 
-                  {activeDropdown === prop.id && (
-                    <div className="absolute right-0 mt-1 w-36 bg-white rounded-xl shadow-lg border border-gray-100 py-1.5 z-20 animate-in fade-in zoom-in-95 duration-100 origin-top-right">
-                      <button 
-                        onClick={(e) => { 
-                          e.stopPropagation(); 
-                          setActiveDropdown(null);
-                          setEditingId(prop.id);
-                          setFormData({
-                            project_id: prop.project_id,
-                            title: prop.title,
-                            description: prop.description,
-                            price: prop.price,
-                            timeline: prop.timeline
-                          });
-                          setIsModalOpen(true);
-                        }}
-                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                        <Edit2 size={14} /> Edit
-                      </button>
-                      <div className="h-px bg-gray-100 my-1"></div>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleDelete(prop.id); }}
-                        className="w-full flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
-                      >
-                        <Trash2 size={14} /> Delete
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mb-4 pr-8">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className={`text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full font-bold border ${statusStyles[prop.status] || statusStyles['Draft']}`}>
-                      {prop.status || 'Draft'}
+                <div className="mb-4 pr-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className={`text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full font-bold border ${statusStyles[proposal.status] || statusStyles['Draft']}`}>
+                      {proposal.status}
                     </span>
                   </div>
-                  <h3 className="font-bold text-xl text-navy leading-tight line-clamp-1">
-                    {prop.title || 'Untitled Proposal'}
-                  </h3>
+                  <h3 className="font-bold text-xl text-navy leading-tight line-clamp-1">{proposal.title}</h3>
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider mt-2">
-                    <FolderKanban size={12} />
-                    {prop.projects?.name || 'Unknown Project'}
+                    <Building size={12} />
+                    {proposal.clients?.company || proposal.clients?.name || 'Unknown Client'}
+                  </div>
+                </div>
+                
+                <div className="flex-grow">
+                  <div className="flex items-center gap-2 text-2xl font-black text-navy mb-4">
+                    <DollarSign size={20} className="text-[#00C896]" />
+                    {proposal.value ? proposal.value.toLocaleString() : '0'}
                   </div>
                 </div>
 
-                <p className="text-sm text-gray-600 line-clamp-2 mb-6 flex-grow">
-                  {prop.description || 'No scope description provided.'}
-                </p>
-                
-                <div className="flex items-center justify-between mb-6">
-                  <div className="text-2xl font-bold text-navy">${prop.price}</div>
-                  <div className="flex items-center gap-1.5 text-sm font-medium text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
-                    <Clock size={14} className="text-gray-400" /> 
-                    {prop.timeline}
+                {/* Footer Actions */}
+                <div className="flex items-center justify-between border-t border-gray-50 pt-4 mt-auto">
+                  <div className="flex items-center gap-2 text-sm text-gray-500 group-hover:text-navy transition-colors">
+                    <div className="w-7 h-7 rounded-md bg-gray-50 flex items-center justify-center shrink-0">
+                      <Calendar size={14} className="text-gray-400" />
+                    </div>
+                    <span className="font-medium text-xs">
+                      {new Date(proposal.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
                   </div>
+                  
+                  <button className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
+                    <Send size={14} /> View
+                  </button>
                 </div>
-                
-                <button 
-                  onClick={(e) => { e.stopPropagation(); copyToClipboard(prop.projects?.client_id); }}
-                  className="w-full mt-auto flex items-center justify-center gap-2 py-2.5 border border-gray-200 text-navy rounded-xl hover:border-navy hover:text-navy hover:bg-gray-50 transition-all font-medium text-sm"
-                >
-                  <Send size={14} /> Copy Portal Link
-                </button>
               </div>
             ))
           )}
         </div>
       )}
 
+      {/* Create Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-navy/40 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" onClick={() => setIsModalOpen(false)}>
-          <div className="bg-white rounded-2xl p-8 w-full max-w-lg shadow-2xl scale-100 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold text-navy mb-1">{editingId ? 'Edit Proposal' : 'Create Proposal'}</h2>
-            <p className="text-sm text-gray-500 mb-6">Draft a new project scope and pricing.</p>
-            
-            {error && <div className="mb-6 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100 flex items-center gap-2">{error}</div>}
-
-            {projects.length === 0 ? (
-              <div className="text-center p-8 bg-gray-50 rounded-xl border border-gray-100">
-                <p className="text-gray-600 mb-4 font-medium">You need a Project first.</p>
-                <button onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 bg-navy text-white font-medium rounded-xl hover:bg-navy/90 transition-all">Close</button>
+        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl scale-100 animate-in zoom-in-95 duration-200 overflow-hidden relative">
+            <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50">
+              <div>
+                <h2 className="text-xl font-bold text-navy">Draft Proposal</h2>
+                <p className="text-sm text-gray-500">Create a new pitch for a client.</p>
               </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Target Project *</label>
-                  <select required className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl outline-none transition-all text-sm font-medium" value={formData.project_id} onChange={e => setFormData({...formData, project_id: e.target.value})}>
-                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-navy transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              {error && (
+                <div className="mb-6 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-red-600"></div>{error}
                 </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Proposal Title *</label>
-                  <input type="text" required className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl outline-none text-sm font-medium" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="e.g. Phase 1: UX/UI Design" />
+              )}
+              
+              {clients.length === 0 ? (
+                <div className="text-center p-8 bg-gray-50 rounded-xl border border-gray-100">
+                  <p className="text-gray-600 mb-4 font-medium">You need to add a Client before creating a Proposal.</p>
+                  <button onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 bg-navy text-white font-medium rounded-xl hover:bg-navy/90 transition-all">Close</button>
                 </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Scope of Work (Description) *</label>
-                  <textarea required className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl outline-none text-sm font-medium resize-none h-24" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Deliverables..."></textarea>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Price ($) *</label>
-                    <input type="number" step="0.01" required className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl outline-none text-sm font-medium" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} placeholder="0.00" />
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Target Client *</label>
+                    <select required className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium appearance-none" value={formData.client_id} onChange={e => setFormData({...formData, client_id: e.target.value})}>
+                      {clients.map(c => <option key={c.id} value={c.id}>{c.company || c.name}</option>)}
+                    </select>
                   </div>
+                  
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Timeline *</label>
-                    <input type="text" required className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl outline-none text-sm font-medium" value={formData.timeline} onChange={e => setFormData({...formData, timeline: e.target.value})} placeholder="e.g. 4-6 Weeks" />
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Proposal Title *</label>
+                    <input type="text" required className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="e.g. Q3 Marketing Retainer" />
                   </div>
-                </div>
-                
-                <div className="flex justify-end gap-3 mt-8">
-                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 font-medium text-sm text-gray-600 hover:bg-gray-100 rounded-xl">Cancel</button>
-                  <button 
-                    type="submit" 
-                    disabled={isSubmitting}
-                    className="px-5 py-2.5 font-medium text-sm bg-navy text-white rounded-xl hover:bg-navy/90 active:scale-95 disabled:opacity-70 flex items-center gap-2"
-                  >
-                    {isSubmitting ? 'Drafting...' : 'Draft Proposal'}
-                  </button>
-                </div>
-              </form>
-            )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Estimated Value</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
+                        <input type="number" className="w-full pl-8 bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium" value={formData.value} onChange={e => setFormData({...formData, value: e.target.value})} placeholder="5000" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Initial Status</label>
+                      <select className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium appearance-none" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
+                        <option value="Draft">Draft</option>
+                        <option value="Sent">Sent</option>
+                        <option value="Accepted">Accepted</option>
+                        <option value="Declined">Declined</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-50">
+                    <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 font-medium text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">Cancel</button>
+                    <button type="submit" className="px-5 py-2.5 font-medium text-sm bg-navy text-white rounded-xl hover:bg-navy/90 transition-all shadow-sm active:scale-95">Save Proposal</button>
+                  </div>
+                </form>
+              )}
+            </div>
           </div>
         </div>
       )}
