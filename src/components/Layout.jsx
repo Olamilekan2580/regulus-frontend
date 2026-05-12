@@ -14,7 +14,8 @@ import {
   User,
   Shield,
   Scale,
-  Terminal 
+  Terminal,
+  Workflow 
 } from 'lucide-react';
 import api from '../lib/api';
 import BillingWall from './BillingWall'; // NEW: The Gatekeeper Component
@@ -91,6 +92,7 @@ export default function Layout() {
     { name: 'Invoices', path: '/invoices', icon: Receipt },
     { name: 'Proposals', path: '/proposals', icon: FileText },
     { name: 'Credential Vault', path: '/vault', icon: Shield },
+    { name: 'Automation Hub', path: '/blueprints', icon: Workflow }, // INTEGRATED: The Blueprint Engine
     { name: 'Contract Sandbox', path: '/sandbox', icon: Scale },
     { name: 'Infrastructure', path: '/infrastructure', icon: Terminal },
   ];
@@ -115,7 +117,15 @@ export default function Layout() {
               }`}
             >
               <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'text-accent' : 'text-gray-500 group-hover:text-gray-300'} />
-              {item.name}
+              
+              <span className="flex-1">{item.name}</span>
+
+              {/* UPGRADE: Visual "NEW" Badge for Feature Discoverability */}
+              {item.path === '/blueprints' && (
+                <span className="text-[10px] bg-accent/10 text-accent px-1.5 py-0.5 rounded-md border border-accent/20 font-black tracking-tighter animate-pulse">
+                  NEW
+                </span>
+              )}
             </Link>
           );
         })}
@@ -133,7 +143,7 @@ export default function Layout() {
           <User size={20} strokeWidth={location.pathname.startsWith('/profile') ? 2.5 : 2} className={location.pathname.startsWith('/profile') ? 'text-accent' : 'text-gray-500 group-hover:text-gray-300'} />
           My Profile
         </Link>
-
+        
         {/* WORKSPACE SETTINGS */}
         <Link
           to="/settings"
