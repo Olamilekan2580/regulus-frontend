@@ -1,13 +1,10 @@
 /**
- * @fileoverview Global Authentication State Manager
- * @architecture Memory-Leak Protected, Asynchronous Session Verification
- * * CRITICAL FIXES APPLIED (ISSUE #23):
- * - Implemented `isMounted` guard to prevent state updates on unmounted components.
- * - Added a `return () => { isMounted = false }` cleanup function.
- * - Preserved the 404 bypass logic to allow new users to hit the workspace creation flow.
+ * @fileoverview Dual-Engine Global Authentication State Manager
+ * @architecture Handles both Supabase OAuth & Legacy Custom JWTs simultaneously
  */
 
 import { createContext, useContext, useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
 import api from '../lib/api';
 
 const AuthContext = createContext({});
@@ -17,61 +14,85 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let isMounted = true; // 🔒 CRITICAL FIX: Memory leak protection flag
+    let isMounted = true; 
 
-    const verifySession = async () => {
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        if (isMounted) {
-          setUser(null);
-          setLoading(false);
-        }
-        return;
-      }
-
+    const verifyDualEngineSession = async () => {
       try {
-        // Ping the backend to verify the token and workspace context
+        // ENGINE 1: Check Supabase First (Highest Priority)
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        // ENGINE 2: Fallback to Legacy Custom Token
+        const legacyToken = localStorage.getItem('token');
+
+        // If neither engine has a key, lock the door.
+        if (!session && !legacyToken) {
+          if (isMounted) {
+            setUser(null);
+            setLoading(false);
+          }
+          return;
+        }
+
+        // Both engines now rely on api.js to attach the correct headers.
+        // Ping the backend to verify the token is valid and grab the workspace.
         await api.get('/orgs/me');
         
-        // Token is valid and workspace exists
+        // If the ping succeeds, set the user state based on the winning engine
         if (isMounted) {
-          setUser({ token });
+           setUser(session ? session.user : { token: legacyToken });
         }
       } catch (err) {
         if (isMounted) {
-          // If the error is 404, they just don't have a workspace yet. 
-          // Their token is still perfectly valid. Let them in so ProtectedRoute can send them to onboarding.
           if (err.response && err.response.status === 404) {
-            setUser({ token });
+            // 404 Workspace not found - but the auth token itself IS valid. 
+            // Let them into the system so ProtectedRoute can send them to setup.
+            const { data: { session } } = await supabase.auth.getSession();
+            const legacyToken = localStorage.getItem('token');
+            setUser(session ? session.user : { token: legacyToken });
           } else {
-            // It's a real authentication error (e.g., 401 Expired or 403 Forbidden). Wipe it.
+            // 401/403: Total Authentication Failure. Nuke everything.
             localStorage.removeItem('token');
             localStorage.removeItem('current_org_id');
+            await supabase.auth.signOut();
             setUser(null);
           }
         }
       } finally {
-        // Only stop the loading spinner if the component hasn't been destroyed
-        if (isMounted) {
-          setLoading(false);
-        }
+        if (isMounted) setLoading(false);
       }
     };
 
-    verifySession();
+    verifyDualEngineSession();
 
-    // 🔒 CLEANUP FUNCTION: Fires automatically when the component unmounts
+    // THE LISTENER: Automatically reacts to GitHub OAuth redirects in the background
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        if (isMounted) {
+          setUser(null);
+          localStorage.removeItem('token'); 
+          localStorage.removeItem('current_org_id');
+        }
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (isMounted && session) {
+          setUser(session.user);
+        }
+      }
+    });
+
+    // Cleanup memory leaks
     return () => {
       isMounted = false; 
+      authListener.subscription.unsubscribe();
     };
   }, []);
 
-  const logout = () => {
+  const logout = async () => {
+    // Total system wipe on logout to prevent ghost sessions
+    await supabase.auth.signOut();
     localStorage.removeItem('token');
     localStorage.removeItem('current_org_id');
     setUser(null);
-    window.location.href = '/login'; // Force a hard reload to clear all React state trees
+    window.location.href = '/login'; 
   };
 
   return (
