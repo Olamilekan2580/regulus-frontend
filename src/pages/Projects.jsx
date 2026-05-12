@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Plus, FolderKanban, Calendar, Clock, CheckCircle, Building, MoreVertical } from 'lucide-react';
+import { Plus, FolderKanban, Calendar, Clock, CheckCircle, Building, MoreVertical, Link as LinkIcon, X, Send } from 'lucide-react';
 import api from '../lib/api';
+import ProjectShareLinks from '../components/ProjectShareLinks';
+import ProjectUpdateUploader from '../components/ProjectUpdateUploader';
 
 export default function Projects() {
   const [projects, setProjects] = useState([]);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [shareProject, setShareProject] = useState(null); 
+  const [updateProject, setUpdateProject] = useState(null); // NEW: Tracks which project to update
   const [error, setError] = useState('');
   
   const [formData, setFormData] = useState({
@@ -59,7 +63,6 @@ export default function Projects() {
     }
   };
 
-  // Upgraded Premium Status Colors
   const statusStyles = {
     'Planning': 'bg-gray-100 text-gray-700 border-gray-200',
     'Active': 'bg-blue-50 text-blue-700 border-blue-200',
@@ -91,7 +94,6 @@ export default function Projects() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {projects.length === 0 ? (
-            /* PREMIUM EMPTY STATE */
             <div className="col-span-full flex flex-col items-center justify-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200 p-16 text-center">
               <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4 border border-gray-100">
                 <FolderKanban size={28} className="text-gray-400" />
@@ -109,7 +111,6 @@ export default function Projects() {
             </div>
           ) : (
             projects.map(project => (
-              /* PREMIUM PROJECT CARD */
               <div key={project.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group relative flex flex-col h-full">
                 
                 {/* Settings menu trigger */}
@@ -134,14 +135,33 @@ export default function Projects() {
                   {project.description || 'No description provided.'}
                 </p>
 
-                <div className="flex items-center gap-4 text-sm text-gray-500 border-t border-gray-50 pt-4 mt-auto">
-                  <div className="flex items-center gap-2 group-hover:text-navy transition-colors">
+                {/* Footer with Share & Update Buttons */}
+                <div className="flex items-center justify-between border-t border-gray-50 pt-4 mt-auto">
+                  <div className="flex items-center gap-2 text-sm text-gray-500 group-hover:text-navy transition-colors">
                     <div className="w-7 h-7 rounded-md bg-gray-50 flex items-center justify-center shrink-0">
                       <Calendar size={14} className="text-gray-400" />
                     </div>
                     <span className="font-medium">
                       {project.deadline ? new Date(project.deadline).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'No deadline'}
                     </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    {/* NEW: Post Update Button */}
+                    <button 
+                      onClick={() => setUpdateProject(project)}
+                      className="flex items-center gap-1.5 text-xs font-bold text-navy bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      <Send size={14} /> Update
+                    </button>
+
+                    {/* Existing Share Button */}
+                    <button 
+                      onClick={() => setShareProject(project)}
+                      className="flex items-center gap-1.5 text-xs font-bold text-[#00C896] bg-[#00C896]/10 hover:bg-[#00C896]/20 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      <LinkIcon size={14} /> Share
+                    </button>
                   </div>
                 </div>
               </div>
@@ -150,7 +170,54 @@ export default function Projects() {
         </div>
       )}
 
-      {/* Premium Modal */}
+      {/* Share Links Modal */}
+      {shareProject && (
+        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-[#0A0F1E] rounded-2xl w-full max-w-xl shadow-2xl scale-100 animate-in zoom-in-95 duration-200 overflow-hidden border border-slate-800">
+            <div className="flex justify-between items-center p-6 border-b border-slate-800 bg-slate-900/50">
+              <h2 className="text-xl font-bold text-white">Share Project: {shareProject.name}</h2>
+              <button onClick={() => setShareProject(null)} className="text-slate-400 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6">
+              <ProjectShareLinks project={shareProject} />
+              <button 
+                onClick={() => setShareProject(null)}
+                className="w-full mt-4 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Post Update Modal (NEW) */}
+      {updateProject && (
+        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl scale-100 animate-in zoom-in-95 duration-200 overflow-hidden relative">
+            <button 
+              onClick={() => setUpdateProject(null)} 
+              className="absolute top-4 right-4 text-gray-400 hover:text-navy transition-colors z-10"
+            >
+              <X size={20} />
+            </button>
+            
+            <div className="p-2 mt-4">
+              <ProjectUpdateUploader 
+                projectId={updateProject.id} 
+                onUpdatePosted={() => {
+                  setUpdateProject(null);
+                  fetchData(); // Refresh to pull in any updated data
+                }} 
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Premium Create Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-navy/40 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl p-8 w-full max-w-lg shadow-2xl scale-100 animate-in zoom-in-95 duration-200">

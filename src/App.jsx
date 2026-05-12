@@ -18,6 +18,8 @@ import ContractSandbox from './pages/ContractSandbox';
 import CreateWorkspace from './pages/CreateWorkspace';
 import Vault from './pages/Vault';
 import SecretReveal from './pages/SecretReveal';
+import PublicIntake from './pages/PublicIntake';
+import PublicTimeline from './pages/PublicTimeline';
 
 export default function App() {
   return (
@@ -62,6 +64,8 @@ export default function App() {
         <Route path="join" element={<JoinOrg />} />
         <Route path="sandbox" element={<ContractSandbox />} />
         <Route path="vault" element={<Vault />} />
+        <Route path="/public/intake/:token" element={<PublicIntake />} />
+        <Route path="/public/updates/:token" element={<PublicTimeline />} />
       </Route>
 
       {/* Global 404 */}
