@@ -20,6 +20,7 @@ import Vault from './pages/Vault';
 import SecretReveal from './pages/SecretReveal';
 import PublicIntake from './pages/PublicIntake';
 import PublicTimeline from './pages/PublicTimeline';
+import AutomationHub from './pages/AutomationHub';
 
 export default function App() {
   return (
@@ -66,6 +67,7 @@ export default function App() {
         <Route path="join" element={<JoinOrg />} />
         <Route path="sandbox" element={<ContractSandbox />} />
         <Route path="vault" element={<Vault />} />
+        <Route path="blueprints" element={<AutomationHub />} />
       </Route>
 
       {/* Global 404 */}
