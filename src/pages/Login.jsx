@@ -24,7 +24,7 @@ export default function Login() {
         provider: 'github',
         options: {
           // Point this to whatever page handles your post-login routing
-          redirectTo: `${window.location.origin}/dashboard`
+          redirectTo: `${window.location.origin}/`
         }
       });
 
