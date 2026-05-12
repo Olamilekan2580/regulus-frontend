@@ -1,40 +1,91 @@
-import axios from 'axios';
+/**
+ * @fileoverview Global Authentication State Manager (Supabase Native)
+ * @architecture Memory-Leak Protected, Event-Driven Session Verification
+ */
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL, 
-});
+import { createContext, useContext, useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
+import api from '../lib/api';
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  const orgId = localStorage.getItem('current_org_id');
-  
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  if (orgId) config.headers['x-org-id'] = orgId; 
-  
-  return config;
-});
+const AuthContext = createContext({});
 
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response && error.response.status === 402) {
-      window.dispatchEvent(new Event('trigger-billing-wall'));
-    }
-    
-    if (error.response && error.response.status === 401) {
-      // Clear the stale data
-      localStorage.removeItem('token');
-      localStorage.removeItem('current_org_id');
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true; 
+
+    const initializeAuth = async () => {
+      // 1. Interrogate Supabase for an active session (automatically handles the URL hash)
+      const { data: { session }, error } = await supabase.auth.getSession();
       
-      // THE FIX: Only trigger a hard redirect if we aren't already on the login page.
-      // This stops Axios and Supabase from fighting over the browser's location state.
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      if (error || !session) {
+        if (isMounted) {
+          setUser(null);
+          setLoading(false);
+        }
+        return;
       }
-    }
-    
-    return Promise.reject(error);
-  }
-);
 
-export default api;
+      // 2. Session exists. Ping the backend to verify workspace context.
+      // The new api.js interceptor will automatically attach the session.access_token
+      try {
+        await api.get('/orgs/me');
+        
+        if (isMounted) setUser(session.user);
+      } catch (err) {
+        if (isMounted) {
+          // 404 means token is valid, but they haven't finished onboarding. Let them through.
+          if (err.response && err.response.status === 404) {
+            setUser(session.user);
+          } else {
+            // Hard 401/403: Token rejected by your backend. Wipe the session.
+            localStorage.removeItem('current_org_id');
+            await supabase.auth.signOut();
+            setUser(null);
+          }
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    initializeAuth();
+
+    // 3. The Listener: Automatically reacts to logins, logouts, and token refreshes
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        if (isMounted) {
+          setUser(null);
+          localStorage.removeItem('current_org_id');
+        }
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (isMounted && session) {
+          setUser(session.user);
+        }
+      }
+    });
+
+    // 4. Cleanup
+    return () => {
+      isMounted = false; 
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem('current_org_id');
+    setUser(null);
+    window.location.href = '/login'; 
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, setUser, logout, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => useContext(AuthContext);
