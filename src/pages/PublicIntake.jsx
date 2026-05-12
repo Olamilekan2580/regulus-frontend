@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../lib/api';
-import { supabase } from '../lib/supabase'; // Requires your existing Supabase client
+import { supabase } from '../lib/supabase';
 
 const PublicIntake = () => {
   const { token } = useParams();
@@ -31,7 +31,6 @@ const PublicIntake = () => {
   }, [token]);
 
   const handleFileChange = (e) => {
-    // Convert FileList to Array and append
     const selectedFiles = Array.from(e.target.files);
     setFiles((prev) => [...prev, ...selectedFiles]);
   };
@@ -45,29 +44,49 @@ const PublicIntake = () => {
     if (!requirements.trim() && files.length === 0) return;
     
     setIsSubmitting(true);
+    let uploadedFileUrls = [];
+
     try {
-      // 1. Optional: Upload files directly to the secure Supabase bucket
-      // We group them in a folder named after the project ID
+      // 1. Upload files to the secure Supabase bucket and get public URLs
       if (files.length > 0) {
         for (const file of files) {
+          // 🔒 THE FIX: Sanitize the file name to prevent the 400 Path Error
           const fileExt = file.name.split('.').pop();
-          const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-          const filePath = `${project.id}/${fileName}`;
+          const safeBaseName = file.name
+            .split('.')[0]
+            .replace(/[^a-z0-9]/gi, '_') 
+            .substring(0, 30);
+            
+          const fileName = `client_${safeBaseName}_${Date.now()}.${fileExt}`;
 
           const { error: uploadErr } = await supabase.storage
             .from('project-vault')
-            .upload(filePath, file);
+            .upload(fileName, file);
 
           if (uploadErr) {
             console.error('File upload failed:', uploadErr.message);
-            // We continue even if a file fails to ensure text requirements are saved
+            throw new Error(`Failed to upload ${file.name}`);
           }
+
+          // Generate the public URL so the freelancer can download it later
+          const { data: publicUrlData } = supabase.storage
+            .from('project-vault')
+            .getPublicUrl(fileName);
+            
+          uploadedFileUrls.push(publicUrlData.publicUrl);
         }
       }
 
-      // 2. Submit text requirements to the backend to unlock the project
-      await api.post(`/public/intake/${token}`, { 
-        requirements 
+      // 2. Submit formatted data to the NEW backend route
+      // Format the text into a JSON object so it renders cleanly in the feed
+      const intakeData = {
+        project_requirements: requirements
+      };
+
+      // Hit the specific project submission endpoint
+      await api.post(`/projects/${project.id}/submissions`, { 
+        form_data: intakeData,
+        files: uploadedFileUrls
       });
 
       setSuccess(true);
