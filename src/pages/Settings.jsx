@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Users, Palette, Trash2, ShieldAlert, CreditCard, Copy, Crown, Lock, Edit2, CheckCircle2, Zap, GitBranch } from 'lucide-react';
 import InviteModal from '../components/InviteModal';
 import api from '../lib/api';
+import DomainManager from '../components/DomainManager';
 
 export default function Settings() {
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -66,7 +67,6 @@ export default function Settings() {
           if (pay.paystack_pk) setPaystackPk(pay.paystack_pk);
           if (pay.paystack_sk) setPaystackSk(pay.paystack_sk);
 
-          // 🔒 THE FIX: Check for ANY key presence (Public or Secret) to trigger the lock
           const hasStripe = Boolean(pay.stripe_pk || (pay.stripe_sk && pay.stripe_sk !== ''));
           const hasPaystack = Boolean(pay.paystack_pk || (pay.paystack_sk && pay.paystack_sk !== ''));
           
@@ -143,7 +143,6 @@ export default function Settings() {
   const handlePlanSelection = async (tier) => {
     setIsProcessingUpgrade(true);
     try {
-      // 🔒 THE FIX: Pointing to the correct backend endpoint
       const res = await api.post('/billing/subscribe', { 
         plan_tier: tier, 
         org_id: orgId 
@@ -213,7 +212,7 @@ export default function Settings() {
           </section>
         )}
 
-        {/* ISSUE #22 FIXED: TEAM DIRECTORY SECTION */}
+        {/* TEAM DIRECTORY SECTION */}
         <section className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
@@ -440,6 +439,13 @@ export default function Settings() {
             </div>
           )}
         </section>
+
+        {/* WHITE-LABEL ENGINE (DOMAIN MANAGER) */}
+        {isAdminOrOwner && (
+          <div className="mt-4">
+            <DomainManager currentDomain={orgData?.custom_domain} status={orgData?.domain_status} />
+          </div>
+        )}
         
       </div>
 

@@ -1,4 +1,7 @@
+import { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
+import api from './lib/api';
+
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import TrialBanner from './components/TrialBanner';
@@ -23,6 +26,73 @@ import PublicTimeline from './pages/PublicTimeline';
 import AutomationHub from './pages/AutomationHub';
 
 export default function App() {
+  const [isRouting, setIsRouting] = useState(true);
+  const [tenantError, setTenantError] = useState(false);
+
+  useEffect(() => {
+    const routeEdgeRequest = async () => {
+      const hostname = window.location.hostname;
+      
+      // 1. Bypass interceptor for localhost or your base Vercel domain
+      if (
+        hostname === 'localhost' || 
+        hostname === '127.0.0.1' || 
+        hostname.includes('vercel.app')
+      ) {
+        setIsRouting(false);
+        return;
+      }
+
+      // 2. We are on a custom domain. Execute the lookup.
+      try {
+        const res = await api.get(`/public/domain-lookup?domain=${hostname}`);
+        const org = res.data;
+
+        // 3. Inject the white-label environment
+        if (org && org.brand_settings) {
+          const brand = typeof org.brand_settings === 'string' ? JSON.parse(org.brand_settings) : org.brand_settings;
+          const root = document.documentElement;
+          
+          if (brand.primary) root.style.setProperty('--theme-navy', brand.primary);
+          if (brand.accent) root.style.setProperty('--theme-accent', brand.accent);
+          
+          // Save the tenant ID so the login screen knows which agency this user belongs to
+          localStorage.setItem('tenant_org_id', org.id);
+          localStorage.setItem('tenant_org_name', org.name);
+        }
+        
+        setIsRouting(false);
+      } catch (err) {
+        console.error('Unregistered Domain Request:', hostname);
+        setTenantError(true);
+        setIsRouting(false);
+      }
+    };
+
+    routeEdgeRequest();
+  }, []);
+
+  // Show a loading state during the split-second DNS lookup
+  if (isRouting) {
+    return (
+      <div className="min-h-screen bg-[#0A0F1E] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00C896]"></div>
+      </div>
+    );
+  }
+
+  // If someone points a random domain to your server that isn't in your database
+  if (tenantError) {
+    return (
+      <div className="min-h-screen bg-[#0A0F1E] flex items-center justify-center p-4">
+        <div className="text-center text-white max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
+          <h1 className="text-2xl font-black mb-2">Workspace Not Found</h1>
+          <p className="text-slate-400 text-sm">This domain is not registered on our edge network. Please check your DNS settings or contact support.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Routes>
       {/* 🟢 PUBLIC ROUTES (No login required) */}
