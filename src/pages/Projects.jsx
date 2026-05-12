@@ -3,6 +3,7 @@ import { Plus, FolderKanban, Calendar, Clock, CheckCircle, Building, MoreVertica
 import api from '../lib/api';
 import ProjectShareLinks from '../components/ProjectShareLinks';
 import ProjectUpdateUploader from '../components/ProjectUpdateUploader';
+import ClientSubmissionsFeed from '../components/ClientSubmissionsFeed';
 
 export default function Projects() {
   const [projects, setProjects] = useState([]);
@@ -10,7 +11,7 @@ export default function Projects() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [shareProject, setShareProject] = useState(null); 
-  const [updateProject, setUpdateProject] = useState(null); // NEW: Tracks which project to update
+  const [updateProject, setUpdateProject] = useState(null);
   const [error, setError] = useState('');
   
   const [formData, setFormData] = useState({
@@ -28,7 +29,6 @@ export default function Projects() {
         api.get('/clients')
       ]);
       
-      // THE FIX: Force the data to be an array. If the API returns an error object, fallback to empty array [] so .map() never crashes.
       const safeProjects = Array.isArray(projRes.data) ? projRes.data : (projRes.data?.data || []);
       const safeClients = Array.isArray(clientRes.data) ? clientRes.data : (clientRes.data?.data || []);
       
@@ -40,7 +40,6 @@ export default function Projects() {
       }
     } catch (err) {
       console.error('Failed to fetch data:', err);
-      // Ensure we still set arrays on network failure to prevent crash
       setProjects([]);
       setClients([]);
     } finally {
@@ -155,12 +154,12 @@ export default function Projects() {
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    {/* NEW: Post Update Button */}
+                    {/* Post Update Button (Now opens Unified Hub) */}
                     <button 
                       onClick={() => setUpdateProject(project)}
                       className="flex items-center gap-1.5 text-xs font-bold text-navy bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
                     >
-                      <Send size={14} /> Update
+                      <Send size={14} /> Manage
                     </button>
 
                     {/* Existing Share Button */}
@@ -201,26 +200,48 @@ export default function Projects() {
         </div>
       )}
 
-      {/* Post Update Modal (NEW) */}
+      {/* Unified Project Hub Modal (Upgraded) */}
       {updateProject && (
-        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl scale-100 animate-in zoom-in-95 duration-200 overflow-hidden relative">
-            <button 
-              onClick={() => setUpdateProject(null)} 
-              className="absolute top-4 right-4 text-gray-400 hover:text-navy transition-colors z-10"
-            >
-              <X size={20} />
-            </button>
+        <div className="fixed inset-0 bg-navy/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-gray-50 rounded-3xl w-full max-w-6xl shadow-2xl scale-100 animate-in zoom-in-95 duration-200 overflow-hidden relative max-h-[90vh] flex flex-col">
             
-            <div className="p-2 mt-4">
-              <ProjectUpdateUploader 
-                projectId={updateProject.id} 
-                onUpdatePosted={() => {
-                  setUpdateProject(null);
-                  fetchData(); // Refresh to pull in any updated data
-                }} 
-              />
+            {/* Hub Header */}
+            <div className="flex justify-between items-center p-6 bg-white border-b border-gray-100 shrink-0">
+              <div>
+                <h2 className="text-xl font-bold text-navy flex items-center gap-2">
+                  <FolderKanban size={24} className="text-accent" /> 
+                  Project Hub: {updateProject.name}
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">Manage outbound updates and view incoming client submissions.</p>
+              </div>
+              <button 
+                onClick={() => setUpdateProject(null)} 
+                className="text-gray-400 hover:text-navy transition-colors bg-gray-50 p-2.5 rounded-full hover:bg-gray-100"
+              >
+                <X size={20} />
+              </button>
             </div>
+            
+            {/* Hub Body (Scrollable 2-Column Grid) */}
+            <div className="p-6 overflow-y-auto">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                
+                {/* Left Column: Freelancer Output */}
+                <div>
+                  <ProjectUpdateUploader 
+                    projectId={updateProject.id} 
+                    onUpdatePosted={() => fetchData()} 
+                  />
+                </div>
+
+                {/* Right Column: Client Intake */}
+                <div>
+                  <ClientSubmissionsFeed projectId={updateProject.id} />
+                </div>
+
+              </div>
+            </div>
+
           </div>
         </div>
       )}
