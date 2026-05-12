@@ -34,23 +34,29 @@ const ProjectUpdateUploader = ({ projectId, onUpdatePosted }) => {
       // 1. Upload files to Supabase Storage
       if (files.length > 0) {
         for (const file of files) {
+          // 🔒 THE FIX: Sanitize filename to prevent "path is invalid" errors
           const fileExt = file.name.split('.').pop();
-          const fileName = `update-${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-          const filePath = `${projectId}/updates/${fileName}`;
+          const safeBaseName = file.name
+            .split('.')[0]
+            .replace(/[^a-z0-9]/gi, '_') // Replace special chars with underscore
+            .substring(0, 30);           // Keep it short
+          
+          // Use a simple, flat path. Complex nested folders often trigger RLS or Path issues.
+          const fileName = `${safeBaseName}_${Date.now()}_${Math.floor(Math.random() * 1000)}.${fileExt}`;
 
           const { error: uploadErr } = await supabase.storage
             .from('project-vault')
-            .upload(filePath, file);
+            .upload(fileName, file);
 
           if (uploadErr) {
             console.error('File upload failed:', uploadErr.message);
-            throw new Error(`Failed to upload ${file.name}`);
+            throw new Error(`Upload failed: ${uploadErr.message}`);
           }
 
-          // Generate the public URL so the client can download it from the timeline
+          // Generate the public URL
           const { data: publicUrlData } = supabase.storage
             .from('project-vault')
-            .getPublicUrl(filePath);
+            .getPublicUrl(fileName);
             
           uploadedFileUrls.push(publicUrlData.publicUrl);
         }
@@ -63,7 +69,7 @@ const ProjectUpdateUploader = ({ projectId, onUpdatePosted }) => {
         files: uploadedFileUrls
       });
 
-      // 3. Reset form and trigger parent refresh
+      // 3. Reset form
       setTitle('');
       setDescription('');
       setFiles([]);
@@ -92,7 +98,6 @@ const ProjectUpdateUploader = ({ projectId, onUpdatePosted }) => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Title */}
         <div>
           <input
             type="text"
@@ -104,7 +109,6 @@ const ProjectUpdateUploader = ({ projectId, onUpdatePosted }) => {
           />
         </div>
 
-        {/* Description */}
         <div>
           <textarea
             className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium resize-none h-24"
@@ -114,7 +118,6 @@ const ProjectUpdateUploader = ({ projectId, onUpdatePosted }) => {
           ></textarea>
         </div>
 
-        {/* File Uploader */}
         <div className="pt-2">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Deliverables</span>
@@ -124,7 +127,6 @@ const ProjectUpdateUploader = ({ projectId, onUpdatePosted }) => {
             </label>
           </div>
 
-          {/* File Queue */}
           {files.length > 0 && (
             <ul className="space-y-2 mt-3">
               {files.map((file, index) => (
@@ -143,7 +145,6 @@ const ProjectUpdateUploader = ({ projectId, onUpdatePosted }) => {
           )}
         </div>
 
-        {/* Submit Action */}
         <div className="flex justify-end pt-4 border-t border-gray-50 mt-6">
           <button
             type="submit"
