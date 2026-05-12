@@ -456,12 +456,12 @@ export default function Settings() {
                   <li className="flex items-start gap-2 text-sm text-gray-700 font-medium"><CheckCircle2 size={16} className="text-accent shrink-0 mt-0.5"/> Hands-free Onboarding</li>
                 </ul>
                 <button 
-                  onClick={() => handlePlanSelection('enterprise', 'one-time')}
-                  disabled={isProcessingUpgrade}
-                  className="w-full py-3 rounded-xl font-bold bg-gray-100 text-navy hover:bg-gray-200 transition-colors disabled:opacity-50"
+                  onClick={() => window.location.href = 'https://buy.stripe.com/test_4gM9AV0h693n8hUgOz2Ji00'}
+                  className="w-full py-3 rounded-xl font-bold bg-gray-100 text-navy hover:bg-gray-200 transition-colors"
                 >
                   Request Setup
                 </button>
+                  
               </div>
 
             </div>
