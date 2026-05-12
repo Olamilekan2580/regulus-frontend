@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Palette, Trash2, ShieldAlert, CreditCard, Copy, Crown, Lock, Edit2, CheckCircle2, Zap, Github } from 'lucide-react';
+import { Users, Palette, Trash2, ShieldAlert, CreditCard, Copy, Crown, Lock, Edit2, CheckCircle2, Zap, GitBranch } from 'lucide-react';
 import InviteModal from '../components/InviteModal';
 import api from '../lib/api';
 
@@ -279,7 +279,7 @@ export default function Settings() {
         {/* DEVELOPER INTEGRATIONS */}
         <section className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm mb-6">
           <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-gray-100 text-gray-700 rounded-lg"><Github size={20} /></div>
+            <div className="p-2 bg-gray-100 text-gray-700 rounded-lg"><GitBranch size={20} /></div>
             <div>
               <h2 className="text-xl font-bold text-navy">Developer Integrations</h2>
               <p className="text-sm text-gray-500 font-medium mt-1">Connect external platforms for infrastructure provisioning.</p>
