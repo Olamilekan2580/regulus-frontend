@@ -1,26 +1,29 @@
 import { useState, useEffect } from 'react';
-import { Plus, FileText, Calendar, DollarSign, Building, MoreVertical, Send, CheckCircle, X } from 'lucide-react';
+import { Plus, FileText, Calendar, DollarSign, Building, MoreVertical, Send, X, Link as LinkIcon, Check } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 
 export default function Proposals() {
+  const navigate = useNavigate();
   const [proposals, setProposals] = useState([]);
   const [clients, setClients] = useState([]);
-  const [projects, setProjects] = useState([]); // NEW: Added projects state
+  const [projects, setProjects] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState('');
+  const [copiedId, setCopiedId] = useState(null); // State for the Copy Link feedback
   
   const [formData, setFormData] = useState({
     client_id: '',
-    project_id: '', // NEW: Added project reference
+    project_id: '', 
     title: '',
-    price: '', // FIX: Renamed from 'value' to 'price' to match DB
+    description: '', // NEW: Description field
+    price: '', 
     status: 'Draft'
   });
 
   const fetchData = async () => {
     try {
-      // Fetch proposals, clients, and projects simultaneously
       const [propRes, clientRes, projRes] = await Promise.all([
         api.get('/proposals'),
         api.get('/clients'),
@@ -56,11 +59,10 @@ export default function Proposals() {
     setError('');
     
     try {
-      // 🔒 THE FIX: Strict Payload Sanitization
       const sanitizedPayload = {
         ...formData,
-        project_id: formData.project_id || null, // Convert empty string to null
-        price: parseFloat(formData.price) || 0   // Ensure number format
+        project_id: formData.project_id || null, 
+        price: parseFloat(formData.price) || 0   
       };
 
       await api.post('/proposals', sanitizedPayload);
@@ -70,13 +72,22 @@ export default function Proposals() {
         client_id: clients[0]?.id || '',
         project_id: '',
         title: '',
+        description: '', // Reset description
         price: '',
         status: 'Draft'
       });
       fetchData();
     } catch (err) {
-      setError(err.response?.data?.error || 'Database execution failed. Please check inputs.');
+      setError(err.response?.data?.error || 'Database execution failed. Check if "description" column exists in Supabase.');
     }
+  };
+
+  // NEW: Copy to Clipboard for sharing with clients
+  const handleCopyLink = (id) => {
+    const publicUrl = `${window.location.origin}/p/${id}`;
+    navigator.clipboard.writeText(publicUrl);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   const statusStyles = {
@@ -88,7 +99,6 @@ export default function Proposals() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-navy tracking-tight">Proposals</h1>
@@ -102,7 +112,6 @@ export default function Proposals() {
         </button>
       </div>
 
-      {/* Grid */}
       {loading ? (
         <div className="flex items-center justify-center p-12 text-gray-400">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-navy mr-3"></div>
@@ -130,7 +139,6 @@ export default function Proposals() {
             proposals.map(proposal => (
               <div key={proposal.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group relative flex flex-col h-full">
                 
-                {/* Settings menu trigger */}
                 <button className="absolute top-4 right-4 text-gray-300 hover:text-navy opacity-0 group-hover:opacity-100 transition-opacity">
                   <MoreVertical size={18} />
                 </button>
@@ -151,14 +159,13 @@ export default function Proposals() {
                 <div className="flex-grow">
                   <div className="flex items-center gap-2 text-2xl font-black text-navy mb-4">
                     <DollarSign size={20} className="text-[#00C896]" />
-                    {/* Read from either price or value to prevent frontend crashes from old records */}
                     {proposal.price ? proposal.price.toLocaleString() : (proposal.value ? proposal.value.toLocaleString() : '0')}
                   </div>
                 </div>
 
                 {/* Footer Actions */}
                 <div className="flex items-center justify-between border-t border-gray-50 pt-4 mt-auto">
-                  <div className="flex items-center gap-2 text-sm text-gray-500 group-hover:text-navy transition-colors">
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
                     <div className="w-7 h-7 rounded-md bg-gray-50 flex items-center justify-center shrink-0">
                       <Calendar size={14} className="text-gray-400" />
                     </div>
@@ -167,9 +174,23 @@ export default function Proposals() {
                     </span>
                   </div>
                   
-                  <button className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
-                    <Send size={14} /> View
-                  </button>
+                  <div className="flex gap-2">
+                    {/* Share Button */}
+                    <button 
+                      onClick={() => handleCopyLink(proposal.id)}
+                      className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-navy transition-colors"
+                      title="Copy Public Link"
+                    >
+                      {copiedId === proposal.id ? <Check size={16} className="text-green-500" /> : <LinkIcon size={16} />}
+                    </button>
+                    {/* View Button */}
+                    <button 
+                      onClick={() => navigate(`/proposals/${proposal.id}`)}
+                      className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      <Send size={14} /> View
+                    </button>
+                  </div>
                 </div>
               </div>
             ))
@@ -179,8 +200,8 @@ export default function Proposals() {
 
       {/* Create Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl scale-100 animate-in zoom-in-95 duration-200 overflow-hidden relative">
+        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl scale-100 animate-in zoom-in-95 duration-200 my-8 relative">
             <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50">
               <div>
                 <h2 className="text-xl font-bold text-navy">Draft Proposal</h2>
@@ -194,7 +215,8 @@ export default function Proposals() {
             <div className="p-6">
               {error && (
                 <div className="mb-6 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100 flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-red-600"></div>{error}
+                  <div className="w-1.5 h-1.5 rounded-full bg-red-600 shrink-0"></div>
+                  <span>{error}</span>
                 </div>
               )}
               
@@ -226,7 +248,29 @@ export default function Proposals() {
                     <input type="text" required className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="e.g. Q3 Marketing Retainer" />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  {/* NEW: Description Field */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Scope of Work / Description</label>
+                    <textarea 
+                      rows="4"
+                      className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium resize-none" 
+                      value={formData.description} 
+                      onChange={e => setFormData({...formData, description: e.target.value})} 
+                      placeholder="Outline the deliverables, timeline, and goals..." 
+                    />
+                  </div>
+
+                  {/* NEW: File Attachment Placeholder */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Attachments (Optional)</label>
+                    <input 
+                      type="file" 
+                      className="w-full bg-gray-50 border border-gray-200 p-2 rounded-xl text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-navy file:text-white hover:file:bg-navy/90 cursor-pointer"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1 ml-1">Requires Supabase Storage Bucket setup on the backend.</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-2">
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Estimated Value</label>
                       <div className="relative">

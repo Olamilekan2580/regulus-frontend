@@ -32,22 +32,27 @@ export default function Invoices() {
 
   const fetchData = async () => {
     try {
-      // 🔒 FIX: Fetch all relationships simultaneously
       const [invRes, clientRes, projRes] = await Promise.all([
         api.get('/invoices'), 
         api.get('/clients'),
-        api.get('/projects').catch(() => ({ data: [] })) // Fallback if projects route isn't up
+        api.get('/projects').catch(() => ({ data: [] }))
       ]);
       
-      setInvoices(invRes.data || []);
-      setClients(clientRes.data || []);
-      setProjects(projRes.data || []);
+      // 🔒 THE FIX: Safely unwrap the data regardless of how the backend sends it
+      const safeInvoices = Array.isArray(invRes.data) ? invRes.data : (invRes.data?.data || []);
+      const safeClients = Array.isArray(clientRes.data) ? clientRes.data : (clientRes.data?.data || []);
+      const safeProjects = Array.isArray(projRes.data) ? projRes.data : (projRes.data?.data || []);
+
+      setInvoices(safeInvoices);
+      setClients(safeClients);
+      setProjects(safeProjects);
       
-      if (clientRes.data.length > 0) {
-        setFormData(prev => ({ ...prev, client_id: clientRes.data[0].id }));
+      if (safeClients.length > 0) {
+        setFormData(prev => ({ ...prev, client_id: safeClients[0].id }));
       }
     } catch (err) { 
       console.error('[Fetch Error]:', err); 
+      setInvoices([]); // Prevent crashes on error
     } finally { 
       setLoading(false); 
     }
