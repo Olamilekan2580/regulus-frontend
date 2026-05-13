@@ -16,7 +16,7 @@ import {
   Scale,
   Terminal,
   Workflow,
-  Loader2 // NEW: Imported for the spinner
+  Loader2 
 } from 'lucide-react';
 import api from '../lib/api';
 import BillingWall from './BillingWall'; 
@@ -27,12 +27,9 @@ export default function Layout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [orgName, setOrgName] = useState('Regulus.');
   const [isLocked, setIsLocked] = useState(false); 
-  
-  // NEW: State for the hardened footer UI
   const [orgData, setOrgData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // The Subscription Gatekeeper Listener
   useEffect(() => {
     const handleLock = () => setIsLocked(true);
     window.addEventListener('trigger-billing-wall', handleLock);
@@ -46,10 +43,9 @@ export default function Layout() {
     return () => window.removeEventListener('trigger-billing-wall', handleLock);
   }, []);
 
-  // Initialize Organization Context & Dynamic Branding
   useEffect(() => {
     const initializeWorkspace = async () => {
-      setIsLoading(true); // Start loading
+      setIsLoading(true);
       const storedOrgName = localStorage.getItem('current_org_name');
       const orgId = localStorage.getItem('current_org_id');
 
@@ -58,7 +54,7 @@ export default function Layout() {
       if (orgId) {
         try {
           const res = await api.get(`/orgs/${orgId}`);
-          setOrgData(res.data); // Save the data for the footer
+          setOrgData(res.data);
           
           const branding = res.data?.brand_settings;
           if (branding) {
@@ -69,7 +65,7 @@ export default function Layout() {
         } catch (err) {
           console.error('Failed to load workspace branding.');
         } finally {
-          setIsLoading(false); // THE FIX: Guarantees the spinner stops
+          setIsLoading(false); 
         }
       } else {
         setIsLoading(false);
@@ -80,13 +76,9 @@ export default function Layout() {
   }, [location.pathname]); 
 
   const handleLogout = () => {
-    localStorage.removeItem('token'); 
-    localStorage.removeItem('current_org_id');
-    localStorage.removeItem('current_org_name');
-    
+    localStorage.clear();
     document.documentElement.style.removeProperty('--theme-navy');
     document.documentElement.style.removeProperty('--theme-accent');
-    
     navigate('/login');
   };
 
@@ -96,15 +88,16 @@ export default function Layout() {
     { name: 'Projects', path: '/projects', icon: FolderKanban },
     { name: 'Invoices', path: '/invoices', icon: Receipt },
     { name: 'Proposals', path: '/proposals', icon: FileText },
-    { name: 'Credential Vault', path: '/vault', icon: Shield },
-    { name: 'Automation Hub', path: '/blueprints', icon: Workflow }, 
-    { name: 'Contract Sandbox', path: '/sandbox', icon: Scale },
+    { name: 'Vault', path: '/vault', icon: Shield },
+    { name: 'Blueprints', path: '/blueprints', icon: Workflow }, 
+    { name: 'Sandbox', path: '/sandbox', icon: Scale },
     { name: 'Infrastructure', path: '/infrastructure', icon: Terminal },
   ];
 
   const NavLinks = ({ onClick = () => {} }) => (
     <>
-      <nav className="flex-1 overflow-y-auto px-4 space-y-1.5 mt-4 scrollbar-hide pb-4">
+      {/* 🟢 TIGHTENED SCROLLABLE NAV */}
+      <nav className="flex-1 overflow-y-auto px-3 space-y-1 mt-2 scrollbar-hide">
         {navItems.map((item) => {
           const isActive = item.path === '/' 
             ? location.pathname === '/' 
@@ -115,18 +108,16 @@ export default function Layout() {
               key={item.name}
               to={item.path}
               onClick={onClick}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 group ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-200 group ${
                 isActive 
                   ? 'bg-accent/10 text-accent shadow-sm' 
                   : 'text-gray-400 hover:bg-white/5 hover:text-white'
               }`}
             >
-              <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'text-accent' : 'text-gray-500 group-hover:text-gray-300'} />
-              
-              <span className="flex-1">{item.name}</span>
-
+              <item.icon size={18} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'text-accent' : 'text-gray-500 group-hover:text-gray-300'} />
+              <span className="flex-1 truncate">{item.name}</span>
               {item.path === '/blueprints' && (
-                <span className="text-[10px] bg-accent/10 text-accent px-1.5 py-0.5 rounded-md border border-accent/20 font-black tracking-tighter animate-pulse">
+                <span className="text-[9px] bg-accent/20 text-accent px-1.5 py-0.5 rounded font-black animate-pulse">
                   NEW
                 </span>
               )}
@@ -135,62 +126,54 @@ export default function Layout() {
         })}
       </nav>
 
-      {/* NEW HARDENED FOOTER AREA */}
-      <div className="mt-auto flex flex-col shrink-0">
-        
-        {/* Secondary Links */}
-        <div className="px-4 py-3 space-y-1.5 border-t border-white/5">
+      {/* 🟢 COMPRESSED FIXED FOOTER */}
+      <div className="mt-auto flex flex-col shrink-0 bg-black/20">
+        <div className="px-3 py-2 space-y-1 border-t border-white/5">
           <Link
             to="/profile"
             onClick={onClick}
-            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 group ${
-              location.pathname.startsWith('/profile') ? 'bg-accent/10 text-accent shadow-sm' : 'text-gray-400 hover:bg-white/5 hover:text-white'
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-200 group ${
+              location.pathname.startsWith('/profile') ? 'bg-accent/10 text-accent' : 'text-gray-400 hover:bg-white/5 hover:text-white'
             }`}
           >
-            <User size={18} strokeWidth={location.pathname.startsWith('/profile') ? 2.5 : 2} className={location.pathname.startsWith('/profile') ? 'text-accent' : 'text-gray-500 group-hover:text-gray-300'} />
-            <span className="text-sm">My Profile</span>
+            <User size={18} className={location.pathname.startsWith('/profile') ? 'text-accent' : 'text-gray-500'} />
+            <span>Profile</span>
           </Link>
           
           <Link
             to="/settings"
             onClick={onClick}
-            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 group ${
-              location.pathname.startsWith('/settings') ? 'bg-accent/10 text-accent shadow-sm' : 'text-gray-400 hover:bg-white/5 hover:text-white'
+            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-200 group ${
+              location.pathname.startsWith('/settings') ? 'bg-accent/10 text-accent' : 'text-gray-400 hover:bg-white/5 hover:text-white'
             }`}
           >
-            <Settings size={18} strokeWidth={location.pathname.startsWith('/settings') ? 2.5 : 2} className={location.pathname.startsWith('/settings') ? 'text-accent' : 'text-gray-500 group-hover:text-gray-300'} />
-            <span className="text-sm">Workspace Settings</span>
+            <Settings size={18} className={location.pathname.startsWith('/settings') ? 'text-accent' : 'text-gray-500'} />
+            <span>Settings</span>
           </Link>
         </div>
 
-        {/* Immutable User/Logout Bar */}
-        <div className="p-4 bg-black/20 border-t border-white/5 flex items-center justify-between">
-          <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-10 h-10 rounded-full bg-navy flex items-center justify-center border border-white/10 shrink-0">
+        <div className="p-3 border-t border-white/5 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <div className="w-8 h-8 rounded-lg bg-navy flex items-center justify-center border border-white/10 shrink-0">
               {isLoading ? (
-                <Loader2 className="animate-spin text-accent" size={18} />
+                <Loader2 className="animate-spin text-accent" size={14} />
               ) : (
-                <User className="text-gray-400" size={18} />
+                <User className="text-gray-400" size={14} />
               )}
             </div>
             <div className="flex flex-col truncate">
-              <span className="text-sm font-bold text-white truncate">
+              <span className="text-xs font-bold text-white truncate leading-none">
                 {orgData?.name || orgName || 'Personal'}
               </span>
-              {orgData?.plan_tier !== 'agency' && (
-                <button 
-                  onClick={(e) => { e.preventDefault(); navigate('/settings'); onClick(); }} 
-                  className="text-[10px] text-left font-black uppercase tracking-wider text-accent hover:text-white transition-colors mt-0.5"
-                >
-                  Upgrade Plan
-                </button>
-              )}
+              <span className="text-[10px] text-gray-500 font-bold uppercase mt-1">
+                {orgData?.plan_tier || 'Solo'}
+              </span>
             </div>
           </div>
 
           <button
             onClick={() => { handleLogout(); onClick(); }}
-            className="p-2.5 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all shrink-0 ml-2"
+            className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all shrink-0"
             title="Sign Out"
           >
             <LogOut size={18} />
@@ -206,12 +189,12 @@ export default function Layout() {
 
       <div className={`flex h-screen bg-gray-50 overflow-hidden ${isLocked ? 'blur-md pointer-events-none select-none' : ''}`}>
         
-        {/* DESKTOP SIDEBAR */}
-        <div className="hidden md:flex w-64 bg-navy text-gray-300 flex-col border-r border-gray-800 shadow-xl z-20">
-          <div className="p-6 pb-2 shrink-0">
-            <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2 truncate">
-              <div className="min-w-8 w-8 h-8 bg-accent text-navy rounded-lg flex items-center justify-center">
-                <Building2 size={18} strokeWidth={2.5} />
+        {/* DESKTOP SIDEBAR - Width Reduced for Professional Look */}
+        <div className="hidden md:flex w-60 bg-navy text-gray-300 flex-col border-r border-gray-800 shadow-xl z-20">
+          <div className="p-5 pb-2 shrink-0">
+            <h1 className="text-xl font-black text-white tracking-tight flex items-center gap-2 truncate">
+              <div className="w-7 h-7 bg-accent text-navy rounded-md flex items-center justify-center shrink-0">
+                <Building2 size={16} strokeWidth={3} />
               </div>
               <span className="truncate">{orgName}</span>
             </h1>
@@ -220,49 +203,48 @@ export default function Layout() {
           <NavLinks />
         </div>
 
-        {/* MOBILE HEADER */}
-        <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-navy border-b border-gray-800 flex items-center justify-between px-6 z-30 shadow-md">
-          <h1 className="text-xl font-black text-white flex items-center gap-2 truncate max-w-[70%]">
-            <div className="min-w-6 w-6 h-6 bg-accent text-navy rounded-md flex items-center justify-center">
-               <Building2 size={14} strokeWidth={2.5} />
+        {/* MOBILE HEADER - Height Reduced */}
+        <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-navy border-b border-gray-800 flex items-center justify-between px-4 z-30 shadow-md">
+          <h1 className="text-lg font-black text-white flex items-center gap-2 truncate max-w-[70%]">
+            <div className="w-6 h-6 bg-accent text-navy rounded flex items-center justify-center">
+               <Building2 size={14} strokeWidth={3} />
             </div>
             <span className="truncate">{orgName}</span>
           </h1>
           <button 
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="text-gray-400 hover:text-white transition-colors p-2"
+            className="text-gray-400 p-2"
           >
-            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
 
-        {/* MOBILE DRAWER OVERLAY */}
+        {/* MOBILE DRAWER */}
         {isMobileMenuOpen && (
           <div 
-            className="fixed inset-0 bg-navy/80 backdrop-blur-sm z-40 md:hidden animate-in fade-in duration-200"
+            className="fixed inset-0 bg-navy/80 backdrop-blur-sm z-40 md:hidden"
             onClick={() => setIsMobileMenuOpen(false)}
           />
         )}
 
-        {/* MOBILE DRAWER CONTENT */}
-        <div className={`fixed inset-y-0 left-0 w-72 bg-navy text-gray-300 transform transition-transform duration-300 ease-out z-50 md:hidden flex flex-col shadow-2xl ${
+        <div className={`fixed inset-y-0 left-0 w-64 bg-navy text-gray-300 transform transition-transform duration-300 ease-out z-50 md:hidden flex flex-col shadow-2xl ${
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}>
-          <div className="p-6 flex justify-between items-center border-b border-white/5 shrink-0">
-            <h1 className="text-xl font-black text-white flex items-center gap-2 truncate pr-4">
-              <div className="min-w-6 w-6 h-6 bg-accent text-navy rounded-md flex items-center justify-center">
-                 <Building2 size={14} strokeWidth={2.5} />
+          <div className="p-5 flex justify-between items-center border-b border-white/5 shrink-0">
+            <h1 className="text-lg font-black text-white flex items-center gap-2">
+              <div className="w-6 h-6 bg-accent text-navy rounded flex items-center justify-center">
+                 <Building2 size={14} strokeWidth={3} />
               </div>
               <span className="truncate">{orgName}</span>
             </h1>
-            <button onClick={() => setIsMobileMenuOpen(false)} className="text-gray-500 hover:text-white transition-colors p-2"><X size={24} /></button>
+            <button onClick={() => setIsMobileMenuOpen(false)} className="text-gray-500"><X size={20} /></button>
           </div>
           <NavLinks onClick={() => setIsMobileMenuOpen(false)} />
         </div>
 
         {/* MAIN CONTENT AREA */}
-        <main className="flex-1 overflow-auto bg-gray-50 pt-16 md:pt-0 relative">
-          <div className="p-4 md:p-10 max-w-7xl mx-auto min-h-full">
+        <main className="flex-1 overflow-auto bg-gray-50 pt-14 md:pt-0 relative">
+          <div className="p-4 md:p-8 max-w-7xl mx-auto min-h-full">
             <Outlet />
           </div>
         </main>
