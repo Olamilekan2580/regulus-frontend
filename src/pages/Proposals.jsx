@@ -5,30 +5,35 @@ import api from '../lib/api';
 export default function Proposals() {
   const [proposals, setProposals] = useState([]);
   const [clients, setClients] = useState([]);
+  const [projects, setProjects] = useState([]); // NEW: Added projects state
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState('');
   
   const [formData, setFormData] = useState({
     client_id: '',
+    project_id: '', // NEW: Added project reference
     title: '',
-    value: '',
+    price: '', // FIX: Renamed from 'value' to 'price' to match DB
     status: 'Draft'
   });
 
   const fetchData = async () => {
     try {
-      const [propRes, clientRes] = await Promise.all([
+      // Fetch proposals, clients, and projects simultaneously
+      const [propRes, clientRes, projRes] = await Promise.all([
         api.get('/proposals'),
-        api.get('/clients')
+        api.get('/clients'),
+        api.get('/projects').catch(() => ({ data: [] }))
       ]);
       
-      // 🔒 THE FIX: Safe array fallback to prevent the .map() crash
       const safeProposals = Array.isArray(propRes.data) ? propRes.data : (propRes.data?.data || []);
       const safeClients = Array.isArray(clientRes.data) ? clientRes.data : (clientRes.data?.data || []);
+      const safeProjects = Array.isArray(projRes.data) ? projRes.data : (projRes.data?.data || []);
       
       setProposals(safeProposals);
       setClients(safeClients);
+      setProjects(safeProjects);
       
       if (safeClients.length > 0) {
         setFormData(prev => ({ ...prev, client_id: safeClients[0].id }));
@@ -49,21 +54,28 @@ export default function Proposals() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    
     try {
-      await api.post('/proposals', {
+      // 🔒 THE FIX: Strict Payload Sanitization
+      const sanitizedPayload = {
         ...formData,
-        value: parseFloat(formData.value) || 0
-      });
+        project_id: formData.project_id || null, // Convert empty string to null
+        price: parseFloat(formData.price) || 0   // Ensure number format
+      };
+
+      await api.post('/proposals', sanitizedPayload);
+      
       setIsModalOpen(false);
       setFormData({
         client_id: clients[0]?.id || '',
+        project_id: '',
         title: '',
-        value: '',
+        price: '',
         status: 'Draft'
       });
       fetchData();
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to create proposal.');
+      setError(err.response?.data?.error || 'Database execution failed. Please check inputs.');
     }
   };
 
@@ -139,7 +151,8 @@ export default function Proposals() {
                 <div className="flex-grow">
                   <div className="flex items-center gap-2 text-2xl font-black text-navy mb-4">
                     <DollarSign size={20} className="text-[#00C896]" />
-                    {proposal.value ? proposal.value.toLocaleString() : '0'}
+                    {/* Read from either price or value to prevent frontend crashes from old records */}
+                    {proposal.price ? proposal.price.toLocaleString() : (proposal.value ? proposal.value.toLocaleString() : '0')}
                   </div>
                 </div>
 
@@ -192,11 +205,20 @@ export default function Proposals() {
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Target Client *</label>
-                    <select required className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium appearance-none" value={formData.client_id} onChange={e => setFormData({...formData, client_id: e.target.value})}>
-                      {clients.map(c => <option key={c.id} value={c.id}>{c.company || c.name}</option>)}
-                    </select>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Target Client *</label>
+                      <select required className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium appearance-none" value={formData.client_id} onChange={e => setFormData({...formData, client_id: e.target.value})}>
+                        {clients.map(c => <option key={c.id} value={c.id}>{c.company || c.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Target Project</label>
+                      <select className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium appearance-none" value={formData.project_id} onChange={e => setFormData({...formData, project_id: e.target.value})}>
+                        <option value="">General (No Project)</option>
+                        {projects.map(p => <option key={p.id} value={p.id}>{p.title || p.name}</option>)}
+                      </select>
+                    </div>
                   </div>
                   
                   <div>
@@ -209,7 +231,7 @@ export default function Proposals() {
                       <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Estimated Value</label>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
-                        <input type="number" className="w-full pl-8 bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium" value={formData.value} onChange={e => setFormData({...formData, value: e.target.value})} placeholder="5000" />
+                        <input type="number" required className="w-full pl-8 bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} placeholder="5000" />
                       </div>
                     </div>
                     <div>

@@ -13,6 +13,7 @@ const currencySymbols = {
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
   const [clients, setClients] = useState([]);
+  const [projects, setProjects] = useState([]); // NEW: Added Projects state
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [downloadingId, setDownloadingId] = useState(null);
@@ -21,6 +22,7 @@ export default function Invoices() {
   
   const [formData, setFormData] = useState({ 
     client_id: '', 
+    project_id: '', // NEW: Added Project ID mapping
     invoice_number: `INV-${Math.floor(1000 + Math.random() * 9000)}`, 
     currency: 'USD',
     status: 'Draft', 
@@ -30,12 +32,17 @@ export default function Invoices() {
 
   const fetchData = async () => {
     try {
-      const [invRes, clientRes] = await Promise.all([
+      // 🔒 FIX: Fetch all relationships simultaneously
+      const [invRes, clientRes, projRes] = await Promise.all([
         api.get('/invoices'), 
-        api.get('/clients')
+        api.get('/clients'),
+        api.get('/projects').catch(() => ({ data: [] })) // Fallback if projects route isn't up
       ]);
+      
       setInvoices(invRes.data || []);
       setClients(clientRes.data || []);
+      setProjects(projRes.data || []);
+      
       if (clientRes.data.length > 0) {
         setFormData(prev => ({ ...prev, client_id: clientRes.data[0].id }));
       }
@@ -94,18 +101,26 @@ export default function Invoices() {
     setError('');
 
     try {
-      const finalTotal = calculateTotal();
-      
-      // Submit fully calculated payload to the secure backend route
-      await api.post('/invoices', { 
-        ...formData, 
-        org_id: orgId, 
-        total: finalTotal 
-      });
+      // 🔒 THE FIX: Strict Payload Sanitization
+      // PostgreSQL will crash if you send an empty string for a UUID foreign key. It MUST be null.
+      const sanitizedPayload = {
+        ...formData,
+        org_id: orgId,
+        project_id: formData.project_id || null, // Convert empty string to null to prevent DB crash
+        total: calculateTotal(),
+        line_items: formData.line_items.map(item => ({
+          description: item.description,
+          quantity: parseFloat(item.quantity) || 1,
+          rate: parseFloat(item.rate) || 0
+        }))
+      };
+
+      await api.post('/invoices', sanitizedPayload);
       
       setIsModalOpen(false);
       setFormData({
         client_id: clients.length > 0 ? clients[0].id : '',
+        project_id: '',
         invoice_number: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
         currency: 'USD',
         status: 'Draft',
@@ -115,7 +130,7 @@ export default function Invoices() {
       fetchData();
     } catch (err) { 
       console.error('Invoice Creation Error:', err.response?.data);
-      setError(err.response?.data?.error || 'Failed to generate invoice.');
+      setError(err.response?.data?.error || 'Database execution failed. Please check your inputs.');
     } finally {
       setIsSubmitting(false);
     }
@@ -128,25 +143,18 @@ export default function Invoices() {
       setInvoices(invoices.map(inv => inv.id === id ? { ...inv, status: newStatus } : inv));
     } catch (err) {
       console.error('Failed to update status');
-      fetchData(); // Revert optimistic update on failure
+      fetchData(); 
     }
   };
 
-  // ARCHITECT FIX: Stripped html2pdf. Now calls the Puppeteer Server endpoint.
   const handleDownload = async (invoice) => {
     setDownloadingId(invoice.id);
-    
     try {
-      // responseType 'blob' is required to handle raw binary PDF streams
-      const response = await api.get(`/invoices/${invoice.id}/pdf`, {
-        responseType: 'blob' 
-      });
-
+      const response = await api.get(`/invoices/${invoice.id}/pdf`, { responseType: 'blob' });
       const clientData = getClientDetails(invoice.client_id);
       const safeClientName = clientData.name.replace(/\s+/g, '_');
       const filename = `${invoice.invoice_number}_${safeClientName}.pdf`;
 
-      // Create a secure memory link and trigger the browser download
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       const link = document.createElement('a');
       link.href = url;
@@ -154,7 +162,6 @@ export default function Invoices() {
       document.body.appendChild(link);
       link.click();
       
-      // Clean up the DOM and memory
       link.parentNode.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (err) {
@@ -267,11 +274,19 @@ export default function Invoices() {
             )}
             
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2">
+              {/* THE GRID FIX: Added Project Selection */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
                   <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Select Client</label>
                   <select required className="w-full bg-gray-50 border border-gray-100 p-3 rounded-xl outline-none focus:ring-2 focus:ring-accent/20 transition-all font-semibold text-sm appearance-none" value={formData.client_id} onChange={e => setFormData({...formData, client_id: e.target.value})}>
                     {clients.map(c => <option key={c.id} value={c.id}>{c.company || c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Select Project</label>
+                  <select className="w-full bg-gray-50 border border-gray-100 p-3 rounded-xl outline-none focus:ring-2 focus:ring-accent/20 transition-all font-semibold text-sm appearance-none" value={formData.project_id} onChange={e => setFormData({...formData, project_id: e.target.value})}>
+                    <option value="">No Project Attached</option>
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.title || p.name}</option>)}
                   </select>
                 </div>
                 <div>
@@ -290,19 +305,21 @@ export default function Invoices() {
 
                 <div className="space-y-3">
                   {formData.line_items.map((item, index) => (
-                    <div key={index} className="flex gap-3 items-start group">
-                      <div className="flex-1">
+                    <div key={index} className="flex flex-col sm:flex-row gap-3 items-start group">
+                      <div className="flex-1 w-full">
                         <input type="text" placeholder="Description (e.g., API Integration)" required className="w-full border border-gray-200 p-3 rounded-xl text-sm outline-none focus:border-accent transition-colors" value={item.description} onChange={e => handleLineItemChange(index, 'description', e.target.value)} />
                       </div>
-                      <div className="w-24">
-                        <input type="number" min="1" step="0.5" placeholder="Qty" required className="w-full border border-gray-200 p-3 rounded-xl text-sm text-center outline-none focus:border-accent transition-colors" value={item.quantity} onChange={e => handleLineItemChange(index, 'quantity', e.target.value)} />
+                      <div className="flex gap-3 w-full sm:w-auto">
+                        <div className="w-24 shrink-0">
+                          <input type="number" min="1" step="0.5" placeholder="Qty" required className="w-full border border-gray-200 p-3 rounded-xl text-sm text-center outline-none focus:border-accent transition-colors" value={item.quantity} onChange={e => handleLineItemChange(index, 'quantity', e.target.value)} />
+                        </div>
+                        <div className="w-32 shrink-0">
+                          <input type="number" min="0" step="0.01" placeholder="Rate" required className="w-full border border-gray-200 p-3 rounded-xl text-sm text-right outline-none focus:border-accent transition-colors" value={item.rate} onChange={e => handleLineItemChange(index, 'rate', e.target.value)} />
+                        </div>
+                        <button type="button" onClick={() => handleRemoveLineItem(index)} disabled={formData.line_items.length === 1} className="p-3 text-gray-300 hover:text-red-500 transition-colors disabled:opacity-30 shrink-0">
+                          <Trash2 size={20} />
+                        </button>
                       </div>
-                      <div className="w-32">
-                        <input type="number" min="0" step="0.01" placeholder="Rate" required className="w-full border border-gray-200 p-3 rounded-xl text-sm text-right outline-none focus:border-accent transition-colors" value={item.rate} onChange={e => handleLineItemChange(index, 'rate', e.target.value)} />
-                      </div>
-                      <button type="button" onClick={() => handleRemoveLineItem(index)} disabled={formData.line_items.length === 1} className="p-3 text-gray-300 hover:text-red-500 transition-colors disabled:opacity-30">
-                        <Trash2 size={20} />
-                      </button>
                     </div>
                   ))}
                 </div>
