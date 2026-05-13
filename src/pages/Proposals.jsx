@@ -12,7 +12,8 @@ export default function Proposals() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState('');
   const [copiedId, setCopiedId] = useState(null); 
-  const [file, setFile] = useState(null); 
+  const [file, setFile] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false); 
   
   // 🔒 THE FIX: State expanded to hold all 7 document sections
   const [formData, setFormData] = useState({
@@ -65,9 +66,10 @@ export default function Proposals() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
+    setIsSubmitting(true); // 🔒 LOCK THE BUTTON
+
     try {
-      // 🔒 THE FIX: Append all 7 document sections to the multipart payload
+      // Append all 7 document sections to the multipart payload
       const payload = new FormData();
       payload.append('client_id', formData.client_id);
       payload.append('project_id', formData.project_id || '');
@@ -109,6 +111,8 @@ export default function Proposals() {
       fetchData();
     } catch (err) {
       setError(err.response?.data?.error || 'Database execution failed. Check backend logs.');
+    } finally {
+      setIsSubmitting(false); // 🔓 UNLOCK THE BUTTON
     }
   };
 
@@ -231,7 +235,7 @@ export default function Proposals() {
 
       {/* Create Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200 overflow-y-auto">
+        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-[999] p-4 animate-in fade-in duration-200 overflow-y-auto">
           {/* 🔒 THE FIX: Widened modal from max-w-xl to max-w-4xl */}
           <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl scale-100 animate-in zoom-in-95 duration-200 my-8 relative">
             <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50">
@@ -336,8 +340,17 @@ export default function Proposals() {
                   </div>
                   
                   <div className="flex justify-end gap-3 pt-2">
-                    <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 font-medium text-sm text-gray-600 hover:bg-gray-100 rounded-xl">Cancel</button>
-                    <button type="submit" className="px-5 py-2.5 font-medium text-sm bg-navy text-white rounded-xl hover:bg-navy/90 shadow-sm">Save Proposal</button>
+                    <button 
+  type="submit" 
+  disabled={isSubmitting}
+  className="px-5 py-2.5 font-medium text-sm bg-navy text-white rounded-xl hover:bg-navy/90 transition-all shadow-sm active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center min-w-[140px]"
+>
+  {isSubmitting ? (
+    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/20 border-t-white"></div>
+  ) : (
+    "Save Proposal"
+  )}
+</button>
                   </div>
                 </form>
               )}

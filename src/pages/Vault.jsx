@@ -8,6 +8,9 @@ export default function Vault() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
+  
+  // 🔒 THE FIX: Added submission state
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     client_id: '',
@@ -36,8 +39,11 @@ export default function Vault() {
 
   useEffect(() => { fetchData(); }, []);
 
+  // 🔒 THE FIX: Wrapped in try/catch/finally with lock toggles
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
+
     try {
       await api.post('/vault', formData);
       setIsModalOpen(false);
@@ -45,6 +51,8 @@ export default function Vault() {
       fetchData();
     } catch (err) {
       alert('Failed to secure credential.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -109,7 +117,8 @@ export default function Vault() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        // 🔒 THE FIX: Elevated to z-[999] to clear the trial banner
+        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-[999] p-4">
           <div className="bg-white rounded-2xl p-8 w-full max-w-lg shadow-2xl animate-in zoom-in-95">
             <h2 className="text-2xl font-bold text-navy mb-2">Secure a Credential</h2>
             <p className="text-sm text-gray-500 mb-6 font-medium">Encrypt an API key, password, or environment variable.</p>
@@ -139,7 +148,20 @@ export default function Vault() {
 
               <div className="flex justify-end gap-3 pt-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2 text-sm font-bold text-gray-400 hover:text-navy">Cancel</button>
-                <button type="submit" className="px-6 py-2.5 bg-navy text-white rounded-xl font-bold flex items-center gap-2 hover:bg-navy/90"><Shield size={18}/> Encrypt & Save</button>
+                {/* 🔒 THE FIX: Submit button locked to isSubmitting state */}
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="px-6 py-2.5 bg-navy text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-navy/90 transition-all shadow-sm active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed min-w-[180px]"
+                >
+                  {isSubmitting ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/20 border-t-white"></div>
+                  ) : (
+                    <>
+                      <Shield size={18}/> Encrypt & Save
+                    </>
+                  )}
+                </button>
               </div>
             </form>
           </div>

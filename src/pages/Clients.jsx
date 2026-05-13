@@ -8,6 +8,7 @@ export default function Clients() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '', company: '', phone: '' });
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchClients = async () => {
     try {
@@ -27,6 +28,8 @@ export default function Clients() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setIsSubmitting(true); // 🔒 LOCK THE BUTTON
+
     try {
       await api.post('/clients', formData);
       setIsModalOpen(false);
@@ -34,6 +37,8 @@ export default function Clients() {
       fetchClients(); // Refresh the list
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create client');
+    } finally {
+      setIsSubmitting(false); // 🔓 UNLOCK THE BUTTON
     }
   };
 
@@ -157,8 +162,17 @@ export default function Clients() {
               </div>
               
               <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-50">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 font-medium text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">Cancel</button>
-                <button type="submit" className="px-5 py-2.5 font-medium text-sm bg-navy text-white rounded-xl hover:bg-navy/90 transition-all shadow-sm active:scale-95">Save Client</button>
+                <button 
+  type="submit" 
+  disabled={isSubmitting}
+  className="px-5 py-2.5 font-medium text-sm bg-navy text-white rounded-xl hover:bg-navy/90 transition-all shadow-sm active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center min-w-[140px]"
+>
+  {isSubmitting ? (
+    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/20 border-t-white"></div>
+  ) : (
+    "Save Client"
+  )}
+</button>
               </div>
             </form>
           </div>
