@@ -235,7 +235,7 @@ export default function Proposals() {
 
       {/* Create Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-[999] p-4 animate-in fade-in duration-200 overflow-y-auto">
+        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200 overflow-y-auto">
           {/* 🔒 THE FIX: Widened modal from max-w-xl to max-w-4xl */}
           <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl scale-100 animate-in zoom-in-95 duration-200 my-8 relative">
             <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50">
