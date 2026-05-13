@@ -98,6 +98,7 @@ export default function App() {
     <Routes>
       {/* 🟢 PUBLIC ROUTES (No login required) */}
       <Route path="/login" element={<Login />} />
+      <Route path="/p/:id" element={<ProposalView />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/portal/:token" element={<ClientPortal />} />
       <Route path="/secret/:id" element={<SecretReveal />} />
