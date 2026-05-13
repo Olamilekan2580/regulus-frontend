@@ -15,38 +15,41 @@ import {
   Shield,
   Scale,
   Terminal,
-  Workflow 
+  Workflow,
+  Loader2 // NEW: Imported for the spinner
 } from 'lucide-react';
 import api from '../lib/api';
-import BillingWall from './BillingWall'; // NEW: The Gatekeeper Component
+import BillingWall from './BillingWall'; 
 
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [orgName, setOrgName] = useState('Regulus.');
-  const [isLocked, setIsLocked] = useState(false); // NEW: Subscription Lock State
+  const [isLocked, setIsLocked] = useState(false); 
+  
+  // NEW: State for the hardened footer UI
+  const [orgData, setOrgData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // NEW: The Subscription Gatekeeper Listener
+  // The Subscription Gatekeeper Listener
   useEffect(() => {
-    // Listen for the custom event fired by the api.js interceptor
     const handleLock = () => setIsLocked(true);
     window.addEventListener('trigger-billing-wall', handleLock);
 
-    // Check if they just returned from a successful Stripe checkout
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('billing') === 'success') {
-      setIsLocked(false); // Unlock the workspace
-      window.history.replaceState(null, '', window.location.pathname); // Clean up the URL
+      setIsLocked(false); 
+      window.history.replaceState(null, '', window.location.pathname); 
     }
 
-    // Cleanup listener on unmount
     return () => window.removeEventListener('trigger-billing-wall', handleLock);
   }, []);
 
   // Initialize Organization Context & Dynamic Branding
   useEffect(() => {
     const initializeWorkspace = async () => {
+      setIsLoading(true); // Start loading
       const storedOrgName = localStorage.getItem('current_org_name');
       const orgId = localStorage.getItem('current_org_id');
 
@@ -54,31 +57,33 @@ export default function Layout() {
 
       if (orgId) {
         try {
-          // Fetch the branding settings for this specific workspace
           const res = await api.get(`/orgs/${orgId}`);
+          setOrgData(res.data); // Save the data for the footer
+          
           const branding = res.data?.brand_settings;
-
           if (branding) {
-            // Inject CSS variables to override Tailwind's default navy/accent
             const root = document.documentElement;
             if (branding.primary) root.style.setProperty('--theme-navy', branding.primary);
             if (branding.accent) root.style.setProperty('--theme-accent', branding.accent);
           }
         } catch (err) {
           console.error('Failed to load workspace branding.');
+        } finally {
+          setIsLoading(false); // THE FIX: Guarantees the spinner stops
         }
+      } else {
+        setIsLoading(false);
       }
     };
 
     initializeWorkspace();
-  }, [location.pathname]); // Re-verify if they switch workspaces
+  }, [location.pathname]); 
 
   const handleLogout = () => {
     localStorage.removeItem('token'); 
     localStorage.removeItem('current_org_id');
     localStorage.removeItem('current_org_name');
     
-    // Clear the injected CSS variables so the login screen resets to default
     document.documentElement.style.removeProperty('--theme-navy');
     document.documentElement.style.removeProperty('--theme-accent');
     
@@ -92,14 +97,14 @@ export default function Layout() {
     { name: 'Invoices', path: '/invoices', icon: Receipt },
     { name: 'Proposals', path: '/proposals', icon: FileText },
     { name: 'Credential Vault', path: '/vault', icon: Shield },
-    { name: 'Automation Hub', path: '/blueprints', icon: Workflow }, // INTEGRATED: The Blueprint Engine
+    { name: 'Automation Hub', path: '/blueprints', icon: Workflow }, 
     { name: 'Contract Sandbox', path: '/sandbox', icon: Scale },
     { name: 'Infrastructure', path: '/infrastructure', icon: Terminal },
   ];
 
   const NavLinks = ({ onClick = () => {} }) => (
     <>
-      <nav className="flex-1 px-4 space-y-1.5 mt-4">
+      <nav className="flex-1 overflow-y-auto px-4 space-y-1.5 mt-4 scrollbar-hide pb-4">
         {navItems.map((item) => {
           const isActive = item.path === '/' 
             ? location.pathname === '/' 
@@ -120,7 +125,6 @@ export default function Layout() {
               
               <span className="flex-1">{item.name}</span>
 
-              {/* UPGRADE: Visual "NEW" Badge for Feature Discoverability */}
               {item.path === '/blueprints' && (
                 <span className="text-[10px] bg-accent/10 text-accent px-1.5 py-0.5 rounded-md border border-accent/20 font-black tracking-tighter animate-pulse">
                   NEW
@@ -131,54 +135,80 @@ export default function Layout() {
         })}
       </nav>
 
-      <div className="p-4 border-t border-white/5 space-y-1.5 mb-4 mt-auto">
-        {/* PERSONAL PROFILE */}
-        <Link
-          to="/profile"
-          onClick={onClick}
-          className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 group ${
-            location.pathname.startsWith('/profile') ? 'bg-accent/10 text-accent shadow-sm' : 'text-gray-400 hover:bg-white/5 hover:text-white'
-          }`}
-        >
-          <User size={20} strokeWidth={location.pathname.startsWith('/profile') ? 2.5 : 2} className={location.pathname.startsWith('/profile') ? 'text-accent' : 'text-gray-500 group-hover:text-gray-300'} />
-          My Profile
-        </Link>
+      {/* NEW HARDENED FOOTER AREA */}
+      <div className="mt-auto flex flex-col shrink-0">
         
-        {/* WORKSPACE SETTINGS */}
-        <Link
-          to="/settings"
-          onClick={onClick}
-          className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 group ${
-            location.pathname.startsWith('/settings') ? 'bg-accent/10 text-accent shadow-sm' : 'text-gray-400 hover:bg-white/5 hover:text-white'
-          }`}
-        >
-          <Settings size={20} strokeWidth={location.pathname.startsWith('/settings') ? 2.5 : 2} className={location.pathname.startsWith('/settings') ? 'text-accent' : 'text-gray-500 group-hover:text-gray-300'} />
-          Workspace Settings
-        </Link>
+        {/* Secondary Links */}
+        <div className="px-4 py-3 space-y-1.5 border-t border-white/5">
+          <Link
+            to="/profile"
+            onClick={onClick}
+            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 group ${
+              location.pathname.startsWith('/profile') ? 'bg-accent/10 text-accent shadow-sm' : 'text-gray-400 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <User size={18} strokeWidth={location.pathname.startsWith('/profile') ? 2.5 : 2} className={location.pathname.startsWith('/profile') ? 'text-accent' : 'text-gray-500 group-hover:text-gray-300'} />
+            <span className="text-sm">My Profile</span>
+          </Link>
+          
+          <Link
+            to="/settings"
+            onClick={onClick}
+            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 group ${
+              location.pathname.startsWith('/settings') ? 'bg-accent/10 text-accent shadow-sm' : 'text-gray-400 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <Settings size={18} strokeWidth={location.pathname.startsWith('/settings') ? 2.5 : 2} className={location.pathname.startsWith('/settings') ? 'text-accent' : 'text-gray-500 group-hover:text-gray-300'} />
+            <span className="text-sm">Workspace Settings</span>
+          </Link>
+        </div>
 
-        {/* LOGOUT */}
-        <button 
-          onClick={() => { handleLogout(); onClick(); }}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 text-left group"
-        >
-          <LogOut size={20} className="text-gray-500 group-hover:text-red-400" />
-          Logout
-        </button>
+        {/* Immutable User/Logout Bar */}
+        <div className="p-4 bg-black/20 border-t border-white/5 flex items-center justify-between">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-10 h-10 rounded-full bg-navy flex items-center justify-center border border-white/10 shrink-0">
+              {isLoading ? (
+                <Loader2 className="animate-spin text-accent" size={18} />
+              ) : (
+                <User className="text-gray-400" size={18} />
+              )}
+            </div>
+            <div className="flex flex-col truncate">
+              <span className="text-sm font-bold text-white truncate">
+                {orgData?.name || orgName || 'Personal'}
+              </span>
+              {orgData?.plan_tier !== 'agency' && (
+                <button 
+                  onClick={(e) => { e.preventDefault(); navigate('/settings'); onClick(); }} 
+                  className="text-[10px] text-left font-black uppercase tracking-wider text-accent hover:text-white transition-colors mt-0.5"
+                >
+                  Upgrade Plan
+                </button>
+              )}
+            </div>
+          </div>
+
+          <button
+            onClick={() => { handleLogout(); onClick(); }}
+            className="p-2.5 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all shrink-0 ml-2"
+            title="Sign Out"
+          >
+            <LogOut size={18} />
+          </button>
+        </div>
       </div>
     </>
   );
 
   return (
     <>
-      {/* NEW: Render the BillingWall over the entire screen if locked */}
       {isLocked && <BillingWall />}
 
-      {/* NEW: Added conditional blurring and disabling of the UI if locked */}
       <div className={`flex h-screen bg-gray-50 overflow-hidden ${isLocked ? 'blur-md pointer-events-none select-none' : ''}`}>
         
         {/* DESKTOP SIDEBAR */}
         <div className="hidden md:flex w-64 bg-navy text-gray-300 flex-col border-r border-gray-800 shadow-xl z-20">
-          <div className="p-6 pb-2">
+          <div className="p-6 pb-2 shrink-0">
             <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2 truncate">
               <div className="min-w-8 w-8 h-8 bg-accent text-navy rounded-lg flex items-center justify-center">
                 <Building2 size={18} strokeWidth={2.5} />
@@ -218,7 +248,7 @@ export default function Layout() {
         <div className={`fixed inset-y-0 left-0 w-72 bg-navy text-gray-300 transform transition-transform duration-300 ease-out z-50 md:hidden flex flex-col shadow-2xl ${
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}>
-          <div className="p-6 flex justify-between items-center border-b border-white/5">
+          <div className="p-6 flex justify-between items-center border-b border-white/5 shrink-0">
             <h1 className="text-xl font-black text-white flex items-center gap-2 truncate pr-4">
               <div className="min-w-6 w-6 h-6 bg-accent text-navy rounded-md flex items-center justify-center">
                  <Building2 size={14} strokeWidth={2.5} />
