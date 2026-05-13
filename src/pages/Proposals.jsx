@@ -12,12 +12,20 @@ export default function Proposals() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState('');
   const [copiedId, setCopiedId] = useState(null); 
-  const [file, setFile] = useState(null); // File state ready
+  const [file, setFile] = useState(null); 
+  
+  // 🔒 THE FIX: State expanded to hold all 7 document sections
   const [formData, setFormData] = useState({
     client_id: '',
     project_id: '', 
     title: '',
     description: '', 
+    executive_summary: '', 
+    objectives: '', 
+    proposed_solution: '', 
+    timeline: '', 
+    deliverables: '', 
+    assumptions: '',
     price: '', 
     status: 'Draft'
   });
@@ -59,32 +67,42 @@ export default function Proposals() {
     setError('');
     
     try {
-      // 🔒 THE FIX: Convert to FormData to support multipart file uploads
+      // 🔒 THE FIX: Append all 7 document sections to the multipart payload
       const payload = new FormData();
       payload.append('client_id', formData.client_id);
       payload.append('project_id', formData.project_id || '');
       payload.append('title', formData.title);
       payload.append('description', formData.description || '');
+      payload.append('executive_summary', formData.executive_summary || '');
+      payload.append('objectives', formData.objectives || '');
+      payload.append('proposed_solution', formData.proposed_solution || '');
+      payload.append('timeline', formData.timeline || '');
+      payload.append('deliverables', formData.deliverables || '');
+      payload.append('assumptions', formData.assumptions || '');
       payload.append('price', parseFloat(formData.price) || 0);
       payload.append('status', formData.status);
       
-      // Append the physical file if it exists
       if (file) {
         payload.append('attachment', file);
       }
 
-      // Explicitly set the headers for multer
       await api.post('/proposals', payload, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
       setIsModalOpen(false);
-      setFile(null); // Reset file on success
+      setFile(null); 
       setFormData({
         client_id: clients[0]?.id || '',
         project_id: '',
         title: '',
         description: '',
+        executive_summary: '', 
+        objectives: '', 
+        proposed_solution: '', 
+        timeline: '', 
+        deliverables: '', 
+        assumptions: '',
         price: '',
         status: 'Draft'
       });
@@ -179,7 +197,6 @@ export default function Proposals() {
                   </div>
                 </div>
 
-                {/* Footer Actions */}
                 <div className="flex items-center justify-between border-t border-gray-50 pt-4 mt-auto">
                   <div className="flex items-center gap-2 text-sm text-gray-500">
                     <div className="w-7 h-7 rounded-md bg-gray-50 flex items-center justify-center shrink-0">
@@ -215,7 +232,8 @@ export default function Proposals() {
       {/* Create Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl scale-100 animate-in zoom-in-95 duration-200 my-8 relative">
+          {/* 🔒 THE FIX: Widened modal from max-w-xl to max-w-4xl */}
+          <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl scale-100 animate-in zoom-in-95 duration-200 my-8 relative">
             <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50">
               <div>
                 <h2 className="text-xl font-bold text-navy">Draft Proposal</h2>
@@ -240,70 +258,86 @@ export default function Proposals() {
                   <button onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 bg-navy text-white font-medium rounded-xl hover:bg-navy/90 transition-all">Close</button>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* Meta Details */}
+                  <div className="grid grid-cols-2 gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Target Client *</label>
-                      <select required className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium appearance-none" value={formData.client_id} onChange={e => setFormData({...formData, client_id: e.target.value})}>
+                      <select required className="w-full bg-white border border-gray-200 p-3 rounded-xl text-sm font-medium" value={formData.client_id} onChange={e => setFormData({...formData, client_id: e.target.value})}>
                         {clients.map(c => <option key={c.id} value={c.id}>{c.company || c.name}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Target Project</label>
-                      <select className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium appearance-none" value={formData.project_id} onChange={e => setFormData({...formData, project_id: e.target.value})}>
+                      <select className="w-full bg-white border border-gray-200 p-3 rounded-xl text-sm font-medium" value={formData.project_id} onChange={e => setFormData({...formData, project_id: e.target.value})}>
                         <option value="">General (No Project)</option>
                         {projects.map(p => <option key={p.id} value={p.id}>{p.title || p.name}</option>)}
                       </select>
                     </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Proposal Title *</label>
-                    <input type="text" required className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="e.g. Q3 Marketing Retainer" />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Scope of Work / Description</label>
-                    <textarea 
-                      rows="4"
-                      className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium resize-none" 
-                      value={formData.description} 
-                      onChange={e => setFormData({...formData, description: e.target.value})} 
-                      placeholder="Outline the deliverables, timeline, and goals..." 
-                    />
+                    <div className="col-span-2">
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Proposal Title *</label>
+                      <input type="text" required className="w-full bg-white border border-gray-200 p-3 rounded-xl text-sm font-medium" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="e.g. Development of SaaS Platform (MVP)" />
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Attachments (Optional)</label>
-                    <input 
-                      type="file" 
-                      onChange={(e) => setFile(e.target.files[0])} // 🔒 THE FIX: Captures the file to state
-                      className="w-full bg-gray-50 border border-gray-200 p-2 rounded-xl text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-navy file:text-white hover:file:bg-navy/90 cursor-pointer"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 pt-2">
+                  {/* Document Sections */}
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Estimated Value</label>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">1.0 Executive Summary</label>
+                      <textarea rows="3" className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl text-sm resize-none" value={formData.executive_summary} onChange={e => setFormData({...formData, executive_summary: e.target.value})} placeholder="High-level overview..." />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">2.0 Project Objectives</label>
+                      <textarea rows="3" className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl text-sm resize-none" value={formData.objectives} onChange={e => setFormData({...formData, objectives: e.target.value})} placeholder="- Build MVP&#10;- Secure Auth..." />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">3.0 Proposed Solution</label>
+                      <textarea rows="3" className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl text-sm resize-none" value={formData.proposed_solution} onChange={e => setFormData({...formData, proposed_solution: e.target.value})} placeholder="React, Node.js, PostgreSQL..." />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">4.0 Project Timeline</label>
+                      <textarea rows="3" className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl text-sm resize-none" value={formData.timeline} onChange={e => setFormData({...formData, timeline: e.target.value})} placeholder="Phase 1: Discovery (1 week)..." />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">5.0 Deliverables</label>
+                      <textarea rows="3" className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl text-sm resize-none" value={formData.deliverables} onChange={e => setFormData({...formData, deliverables: e.target.value})} placeholder="- Fully functional MVP&#10;- Admin Dashboard..." />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">6.0 Assumptions & Limits</label>
+                      <textarea rows="3" className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl text-sm resize-none" value={formData.assumptions} onChange={e => setFormData({...formData, assumptions: e.target.value})} placeholder="Client provides assets..." />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">7.0 Additional Scope / Description</label>
+                      <textarea rows="2" className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl text-sm resize-none" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Any extra details..." />
+                    </div>
+                  </div>
+
+                  {/* Financials & Files */}
+                  <div className="grid grid-cols-3 gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Estimated Budget</label>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">$</span>
-                        <input type="number" required className="w-full pl-8 bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} placeholder="5000" />
+                        <input type="number" required className="w-full pl-8 bg-white border border-gray-200 p-3 rounded-xl text-sm font-medium" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} />
                       </div>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Initial Status</label>
-                      <select className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium appearance-none" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
+                      <select className="w-full bg-white border border-gray-200 p-3 rounded-xl text-sm font-medium" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
                         <option value="Draft">Draft</option>
                         <option value="Sent">Sent</option>
                         <option value="Accepted">Accepted</option>
-                        <option value="Declined">Declined</option>
                       </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Attachment</label>
+                      <input type="file" onChange={(e) => setFile(e.target.files[0])} className="w-full bg-white border border-gray-200 p-2 rounded-xl text-sm text-gray-500 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-navy file:text-white" />
                     </div>
                   </div>
                   
-                  <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-50">
-                    <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 font-medium text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">Cancel</button>
-                    <button type="submit" className="px-5 py-2.5 font-medium text-sm bg-navy text-white rounded-xl hover:bg-navy/90 transition-all shadow-sm active:scale-95">Save Proposal</button>
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 font-medium text-sm text-gray-600 hover:bg-gray-100 rounded-xl">Cancel</button>
+                    <button type="submit" className="px-5 py-2.5 font-medium text-sm bg-navy text-white rounded-xl hover:bg-navy/90 shadow-sm">Save Proposal</button>
                   </div>
                 </form>
               )}

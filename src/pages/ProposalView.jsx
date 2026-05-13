@@ -76,19 +76,49 @@ export default function ProposalView() {
         </div>
 
         {/* Content Section */}
-        <div className="p-8 space-y-8">
-          <div>
-            <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <FileText size={16} /> Scope of Work
-            </h3>
-            <div className="bg-gray-50 p-6 rounded-2xl text-navy font-medium whitespace-pre-wrap leading-relaxed border border-gray-100">
-              {proposal.description || "No description provided for this scope of work."}
+        <div className="p-8 space-y-10">
+          
+          {/* Document Header (Prepared For/By) */}
+          <div className="flex flex-wrap gap-12 border-b border-gray-100 pb-8">
+            <div>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Prepared For</p>
+              <p className="font-bold text-navy text-lg">{proposal.clients?.company || proposal.clients?.name || 'Unknown Client'}</p>
+              <p className="text-sm text-gray-500">{proposal.clients?.email || ''}</p>
+            </div>
+            <div>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Prepared By</p>
+              <p className="font-bold text-navy text-lg">Omole Arch</p> 
+            </div>
+            <div>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Date</p>
+              <p className="font-bold text-navy text-lg">{new Date(proposal.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
             </div>
           </div>
 
+          {/* Dynamic Sections */}
+          {[
+            { id: '1.0', title: 'Executive Summary', content: proposal.executive_summary },
+            { id: '2.0', title: 'Project Objectives', content: proposal.objectives },
+            { id: '3.0', title: 'Proposed Solution', content: proposal.proposed_solution },
+            { id: '4.0', title: 'Project Timeline', content: proposal.timeline },
+            { id: '5.0', title: 'Estimated Budget', content: proposal.price ? `Estimated cost: $${proposal.price.toLocaleString()}\n\nFinal pricing depends on feature finalization.` : null },
+            { id: '6.0', title: 'Deliverables', content: proposal.deliverables },
+            { id: '7.0', title: 'Assumptions', content: proposal.assumptions },
+            { id: '8.0', title: 'Additional Scope', content: proposal.description }
+          ].map((section) => section.content && (
+            <div key={section.id}>
+              <h3 className="text-sm font-black text-navy uppercase tracking-widest mb-4 flex items-center gap-2">
+                <span className="text-accent">{section.id}</span> {section.title}
+              </h3>
+              <div className="bg-gray-50/50 p-6 rounded-2xl text-navy font-medium whitespace-pre-wrap leading-relaxed border border-gray-100">
+                {section.content}
+              </div>
+            </div>
+          ))}
+
           {/* Display Attachment if it exists */}
           {proposal.attachment_url && (
-            <div className="mt-8 pt-8 border-t border-gray-100">
+            <div className="pt-8 border-t border-gray-100">
               <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                 Attached Documents
               </h3>
