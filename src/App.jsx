@@ -24,6 +24,7 @@ import SecretReveal from './pages/SecretReveal';
 import PublicIntake from './pages/PublicIntake';
 import PublicTimeline from './pages/PublicTimeline';
 import AutomationHub from './pages/AutomationHub';
+import ProposalView from './pages/ProposalView';
 
 export default function App() {
   const [isRouting, setIsRouting] = useState(true);
@@ -131,6 +132,8 @@ export default function App() {
         <Route path="projects" element={<Projects />} />
         <Route path="invoices" element={<Invoices />} />
         <Route path="proposals" element={<Proposals />} />
+        {/* 🔒 THE FIX: Added the ProposalView route here */}
+        <Route path="proposals/:id" element={<ProposalView />} />
         <Route path="infrastructure" element={<Infrastructure />} />
         <Route path="profile" element={<Profile />} />
         <Route path="settings" element={<Settings />} />

@@ -82,6 +82,12 @@ export default function Proposals() {
     }
   };
 
+  // Add this right before your statusStyles object
+  const getClientName = (clientId) => {
+    const foundClient = clients.find(c => c.id === clientId);
+    return foundClient ? (foundClient.company || foundClient.name) : 'Unknown Client';
+  };
+
   // NEW: Copy to Clipboard for sharing with clients
   const handleCopyLink = (id) => {
     const publicUrl = `${window.location.origin}/p/${id}`;
@@ -152,7 +158,7 @@ export default function Proposals() {
                   <h3 className="font-bold text-xl text-navy leading-tight line-clamp-1">{proposal.title}</h3>
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider mt-2">
                     <Building size={12} />
-                    {proposal.clients?.company || proposal.clients?.name || 'Unknown Client'}
+                    {getClientName(proposal.client_id)}
                   </div>
                 </div>
                 
