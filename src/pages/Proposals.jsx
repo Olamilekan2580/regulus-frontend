@@ -11,13 +11,13 @@ export default function Proposals() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState('');
-  const [copiedId, setCopiedId] = useState(null); // State for the Copy Link feedback
-  
+  const [copiedId, setCopiedId] = useState(null); 
+  const [file, setFile] = useState(null); // File state ready
   const [formData, setFormData] = useState({
     client_id: '',
     project_id: '', 
     title: '',
-    description: '', // NEW: Description field
+    description: '', 
     price: '', 
     status: 'Draft'
   });
@@ -59,36 +59,46 @@ export default function Proposals() {
     setError('');
     
     try {
-      const sanitizedPayload = {
-        ...formData,
-        project_id: formData.project_id || null, 
-        price: parseFloat(formData.price) || 0   
-      };
+      // 🔒 THE FIX: Convert to FormData to support multipart file uploads
+      const payload = new FormData();
+      payload.append('client_id', formData.client_id);
+      payload.append('project_id', formData.project_id || '');
+      payload.append('title', formData.title);
+      payload.append('description', formData.description || '');
+      payload.append('price', parseFloat(formData.price) || 0);
+      payload.append('status', formData.status);
+      
+      // Append the physical file if it exists
+      if (file) {
+        payload.append('attachment', file);
+      }
 
-      await api.post('/proposals', sanitizedPayload);
+      // Explicitly set the headers for multer
+      await api.post('/proposals', payload, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       
       setIsModalOpen(false);
+      setFile(null); // Reset file on success
       setFormData({
         client_id: clients[0]?.id || '',
         project_id: '',
         title: '',
-        description: '', // Reset description
+        description: '',
         price: '',
         status: 'Draft'
       });
       fetchData();
     } catch (err) {
-      setError(err.response?.data?.error || 'Database execution failed. Check if "description" column exists in Supabase.');
+      setError(err.response?.data?.error || 'Database execution failed. Check backend logs.');
     }
   };
 
-  // Add this right before your statusStyles object
   const getClientName = (clientId) => {
     const foundClient = clients.find(c => c.id === clientId);
     return foundClient ? (foundClient.company || foundClient.name) : 'Unknown Client';
   };
 
-  // NEW: Copy to Clipboard for sharing with clients
   const handleCopyLink = (id) => {
     const publicUrl = `${window.location.origin}/p/${id}`;
     navigator.clipboard.writeText(publicUrl);
@@ -181,7 +191,6 @@ export default function Proposals() {
                   </div>
                   
                   <div className="flex gap-2">
-                    {/* Share Button */}
                     <button 
                       onClick={() => handleCopyLink(proposal.id)}
                       className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-navy transition-colors"
@@ -189,7 +198,6 @@ export default function Proposals() {
                     >
                       {copiedId === proposal.id ? <Check size={16} className="text-green-500" /> : <LinkIcon size={16} />}
                     </button>
-                    {/* View Button */}
                     <button 
                       onClick={() => navigate(`/proposals/${proposal.id}`)}
                       className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
@@ -254,7 +262,6 @@ export default function Proposals() {
                     <input type="text" required className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="e.g. Q3 Marketing Retainer" />
                   </div>
 
-                  {/* NEW: Description Field */}
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Scope of Work / Description</label>
                     <textarea 
@@ -266,14 +273,13 @@ export default function Proposals() {
                     />
                   </div>
 
-                  {/* NEW: File Attachment Placeholder */}
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Attachments (Optional)</label>
                     <input 
                       type="file" 
+                      onChange={(e) => setFile(e.target.files[0])} // 🔒 THE FIX: Captures the file to state
                       className="w-full bg-gray-50 border border-gray-200 p-2 rounded-xl text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-navy file:text-white hover:file:bg-navy/90 cursor-pointer"
                     />
-                    <p className="text-[10px] text-gray-400 mt-1 ml-1">Requires Supabase Storage Bucket setup on the backend.</p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 pt-2">

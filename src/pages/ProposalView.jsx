@@ -85,6 +85,24 @@ export default function ProposalView() {
               {proposal.description || "No description provided for this scope of work."}
             </div>
           </div>
+
+          {/* Display Attachment if it exists */}
+          {proposal.attachment_url && (
+            <div className="mt-8 pt-8 border-t border-gray-100">
+              <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                Attached Documents
+              </h3>
+              <a 
+                href={proposal.attachment_url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-gray-50 border border-gray-200 text-navy font-bold text-sm px-4 py-3 rounded-xl hover:border-navy hover:bg-white transition-colors"
+              >
+                <FileText size={18} className="text-blue-500" />
+                View Attached Document
+              </a>
+            </div>
+          )}
         </div>
       </div>
     </div>
