@@ -12,10 +12,9 @@ export default function Proposals() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState('');
   const [copiedId, setCopiedId] = useState(null); 
-  const [file, setFile] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false); 
-  
-  // 🔒 THE FIX: State expanded to hold all 7 document sections
+  const [file, setFile] = useState(null); 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [formData, setFormData] = useState({
     client_id: '',
     project_id: '', 
@@ -66,10 +65,9 @@ export default function Proposals() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setIsSubmitting(true); // 🔒 LOCK THE BUTTON
-
+    setIsSubmitting(true);
+    
     try {
-      // Append all 7 document sections to the multipart payload
       const payload = new FormData();
       payload.append('client_id', formData.client_id);
       payload.append('project_id', formData.project_id || '');
@@ -112,7 +110,7 @@ export default function Proposals() {
     } catch (err) {
       setError(err.response?.data?.error || 'Database execution failed. Check backend logs.');
     } finally {
-      setIsSubmitting(false); // 🔓 UNLOCK THE BUTTON
+      setIsSubmitting(false);
     }
   };
 
@@ -235,20 +233,24 @@ export default function Proposals() {
 
       {/* Create Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200 overflow-y-auto">
-          {/* 🔒 THE FIX: Widened modal from max-w-xl to max-w-4xl */}
-          <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl scale-100 animate-in zoom-in-95 duration-200 my-8 relative">
-            <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50">
+        <div className="fixed inset-0 z-[9999] bg-navy/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
+          
+          {/* 🔒 THE FIX: flex-col, max-h-[90vh], and overflow-hidden to constrain the modal height */}
+          <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 relative overflow-hidden">
+            
+            {/* 1. FIXED HEADER (shrink-0 ensures it never squishes) */}
+            <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 shrink-0">
               <div>
                 <h2 className="text-xl font-bold text-navy">Draft Proposal</h2>
                 <p className="text-sm text-gray-500">Create a new pitch for a client.</p>
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-navy transition-colors">
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-navy transition-colors bg-white rounded-full p-1 border border-gray-200 shadow-sm">
                 <X size={20} />
               </button>
             </div>
             
-            <div className="p-6">
+            {/* 2. SCROLLABLE BODY (overflow-y-auto ensures the internal fields scroll) */}
+            <div className="p-6 overflow-y-auto flex-1">
               {error && (
                 <div className="mb-6 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100 flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-red-600 shrink-0"></div>
@@ -285,7 +287,7 @@ export default function Proposals() {
                   </div>
 
                   {/* Document Sections */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">1.0 Executive Summary</label>
                       <textarea rows="3" className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl text-sm resize-none" value={formData.executive_summary} onChange={e => setFormData({...formData, executive_summary: e.target.value})} placeholder="High-level overview..." />
@@ -310,14 +312,14 @@ export default function Proposals() {
                       <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">6.0 Assumptions & Limits</label>
                       <textarea rows="3" className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl text-sm resize-none" value={formData.assumptions} onChange={e => setFormData({...formData, assumptions: e.target.value})} placeholder="Client provides assets..." />
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-1 md:col-span-2">
                       <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">7.0 Additional Scope / Description</label>
                       <textarea rows="2" className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl text-sm resize-none" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Any extra details..." />
                     </div>
                   </div>
 
                   {/* Financials & Files */}
-                  <div className="grid grid-cols-3 gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Estimated Budget</label>
                       <div className="relative">
@@ -339,18 +341,22 @@ export default function Proposals() {
                     </div>
                   </div>
                   
-                  <div className="flex justify-end gap-3 pt-2">
+                  {/* 3. FOOTER ACTIONS */}
+                  <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-4">
+                    <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 font-medium text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+                      Cancel
+                    </button>
                     <button 
-  type="submit" 
-  disabled={isSubmitting}
-  className="px-5 py-2.5 font-medium text-sm bg-navy text-white rounded-xl hover:bg-navy/90 transition-all shadow-sm active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center min-w-[140px]"
->
-  {isSubmitting ? (
-    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/20 border-t-white"></div>
-  ) : (
-    "Save Proposal"
-  )}
-</button>
+                      type="submit" 
+                      disabled={isSubmitting}
+                      className="px-5 py-2.5 font-medium text-sm bg-navy text-white rounded-xl hover:bg-navy/90 transition-all shadow-sm active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center min-w-[140px]"
+                    >
+                      {isSubmitting ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/20 border-t-white"></div>
+                      ) : (
+                        "Save Proposal"
+                      )}
+                    </button>
                   </div>
                 </form>
               )}
