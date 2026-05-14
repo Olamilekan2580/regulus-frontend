@@ -1,8 +1,28 @@
 import { useState, useEffect } from 'react';
-import { Users, Palette, Trash2, ShieldAlert, CreditCard, Copy, Crown, Lock, Edit2, CheckCircle2, Zap, GitBranch } from 'lucide-react';
+import { Users, Palette, Trash2, ShieldAlert, CreditCard, Copy, Crown, Lock, Edit2, CheckCircle2, Zap, GitBranch, Shield, AlertCircle } from 'lucide-react';
 import InviteModal from '../components/InviteModal';
 import api from '../lib/api';
 import DomainManager from '../components/DomainManager';
+
+// Flutterwave supported banks for Nigeria
+const NIGERIAN_BANKS = [
+  { code: '044', name: 'Access Bank' },
+  { code: '050', name: 'Ecobank' },
+  { code: '070', name: 'Fidelity Bank' },
+  { code: '011', name: 'First Bank of Nigeria' },
+  { code: '214', name: 'FCMB' },
+  { code: '058', name: 'Guaranty Trust Bank (GTB)' },
+  { code: '030', name: 'Heritage Bank' },
+  { code: '082', name: 'Keystone Bank' },
+  { code: '076', name: 'Polaris Bank' },
+  { code: '221', name: 'Stanbic IBTC' },
+  { code: '232', name: 'Sterling Bank' },
+  { code: '032', name: 'Union Bank' },
+  { code: '033', name: 'United Bank for Africa (UBA)' },
+  { code: '215', name: 'Unity Bank' },
+  { code: '035', name: 'Wema Bank' },
+  { code: '057', name: 'Zenith Bank' }
+];
 
 export default function Settings() {
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -16,21 +36,26 @@ export default function Settings() {
   const [accentColor, setAccentColor] = useState('#00C896');
   const [isSavingTheme, setIsSavingTheme] = useState(false);
 
-  // Payment States
-  const [provider, setProvider] = useState('stripe');
-  const [stripePk, setStripePk] = useState('');
-  const [stripeSk, setStripeSk] = useState('');
-  const [paystackPk, setPaystackPk] = useState('');
-  const [paystackSk, setPaystackSk] = useState('');
+  // Payout Configuration States (Flutterwave Subaccounts)
+  const [payoutType, setPayoutType] = useState('NGN'); // 'NGN' or 'USD'
+  const [payoutInfo, setPayoutInfo] = useState({
+    bank_code: '',
+    account_number: '',
+    routing_number: '',
+    swift_code: '',
+    bank_name: '',
+    fw_subaccount_id: null
+  });
   const [isSavingPayments, setIsSavingPayments] = useState(false);
+  const [isEditingPayments, setIsEditingPayments] = useState(true);
+  const [paymentError, setPaymentError] = useState('');
+  const [paymentSuccess, setPaymentSuccess] = useState('');
+
   const [isProcessingUpgrade, setIsProcessingUpgrade] = useState(false);
   
   // Developer Integration States
   const [githubHandle, setGithubHandle] = useState('');
   const [isSavingGithub, setIsSavingGithub] = useState(false);
-
-  // UI Lock State
-  const [isEditingPayments, setIsEditingPayments] = useState(true);
 
   const orgId = localStorage.getItem('current_org_id'); 
 
@@ -58,21 +83,15 @@ export default function Settings() {
           if (brand.accent) setAccentColor(brand.accent);
         }
 
-        if (data?.payment_settings) {
-          const pay = typeof data.payment_settings === 'string' ? JSON.parse(data.payment_settings) : data.payment_settings;
-          
-          if (pay.provider) setProvider(pay.provider);
-          if (pay.stripe_pk) setStripePk(pay.stripe_pk);
-          if (pay.stripe_sk) setStripeSk(pay.stripe_sk);
-          if (pay.paystack_pk) setPaystackPk(pay.paystack_pk);
-          if (pay.paystack_sk) setPaystackSk(pay.paystack_sk);
-
-          const hasStripe = Boolean(pay.stripe_pk || (pay.stripe_sk && pay.stripe_sk !== ''));
-          const hasPaystack = Boolean(pay.paystack_pk || (pay.paystack_sk && pay.paystack_sk !== ''));
-          
-          if (hasStripe || hasPaystack) {
-            setIsEditingPayments(false);
-          }
+        // Load Flutterwave Subaccount Status
+        if (data?.fw_subaccount_id) {
+          setPayoutInfo(prev => ({ 
+            ...prev, 
+            fw_subaccount_id: data.fw_subaccount_id,
+            account_number: data.account_number || '',
+            bank_name: data.bank_name || ''
+          }));
+          setIsEditingPayments(false);
         }
 
         setMembers(teamRes.data || []);
@@ -99,19 +118,31 @@ export default function Settings() {
     }
   };
 
-  const handleSavePayments = async () => {
+  const handleConnectBank = async (e) => {
+    e.preventDefault();
+    setPaymentError('');
+    setPaymentSuccess('');
     setIsSavingPayments(true);
+
     try {
-      await api.put(`/orgs/${orgId}/payments`, { 
-        provider, 
-        stripe_pk: stripePk, 
-        stripe_sk: stripeSk, 
-        paystack_pk: paystackPk, 
-        paystack_sk: paystackSk 
-      });
+      const selectedBank = payoutType === 'NGN' 
+        ? NIGERIAN_BANKS.find(b => b.code === payoutInfo.bank_code)?.name 
+        : payoutInfo.bank_name;
+
+      const payload = {
+        org_id: orgId,
+        payout_type: payoutType,
+        bank_name: selectedBank,
+        ...payoutInfo
+      };
+
+      const res = await api.post(`/payouts/connect`, payload);
+      
+      setPayoutInfo(prev => ({ ...prev, fw_subaccount_id: res.data.subaccount_id }));
+      setPaymentSuccess('Bank account verified and connected to Flutterwave successfully.');
       setIsEditingPayments(false);
     } catch (err) {
-      alert('Failed to save payment settings.');
+      setPaymentError(err.response?.data?.error || 'Failed to verify bank account with Flutterwave.');
     } finally {
       setIsSavingPayments(false);
     }
@@ -158,11 +189,6 @@ export default function Settings() {
     } finally {
       setIsProcessingUpgrade(false);
     }
-  };
-
-  const maskKey = (key) => {
-    if (!key) return 'Not Configured';
-    return key.substring(0, 8) + '••••••••••••••••' + key.slice(-4);
   };
 
   if (isLoading) return <div className="flex justify-center p-12"><div className="animate-spin w-8 h-8 border-2 border-navy border-t-transparent rounded-full"></div></div>;
@@ -313,91 +339,152 @@ export default function Settings() {
           </div>
         </section>
 
-        {/* SECURE FINANCIAL INTEGRATIONS */}
+        {/* PAYOUT CONFIGURATION (Replaces Payment Vault) */}
         <section className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-100 text-green-600 rounded-lg"><CreditCard size={20} /></div>
               <div>
-                <h2 className="text-xl font-bold text-navy">Payment Vault</h2>
-                <p className="text-sm text-gray-500 font-medium mt-1">Connect your preferred processor to get paid directly.</p>
+                <h2 className="text-xl font-bold text-navy">Payout Configuration</h2>
+                <p className="text-sm text-gray-500 font-medium mt-1">Connect your bank account or Payoneer to receive automated payouts.</p>
               </div>
             </div>
-            {(!isEditingPayments && isAdminOrOwner) && (
-              <button onClick={() => setIsEditingPayments(true)} className="flex items-center gap-1.5 text-xs font-bold text-navy hover:text-accent transition-colors bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
-                <Edit2 size={14} /> Update Keys
-              </button>
-            )}
           </div>
           
           {isEditingPayments && isAdminOrOwner ? (
             <div className="space-y-6 animate-in fade-in duration-300">
-              <div>
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Active Gateway</label>
-                <select value={provider} onChange={(e) => setProvider(e.target.value)} className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl font-bold text-navy outline-none focus:border-accent transition-colors appearance-none cursor-pointer">
-                  <option value="stripe">Stripe (Global / USD)</option>
-                  <option value="paystack">Paystack (Africa / NGN / USD)</option>
-                </select>
-              </div>
-
-              {provider === 'stripe' && (
-                <div className="grid md:grid-cols-2 gap-4 animate-in slide-in-from-top-2">
-                  <div>
-                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Publishable Key</label>
-                    <input type="text" value={stripePk} onChange={(e) => setStripePk(e.target.value)} placeholder="pk_live_..." className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-accent font-mono text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Secret Key</label>
-                    <input type="password" value={stripeSk} onChange={(e) => setStripeSk(e.target.value)} placeholder="sk_live_..." className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-accent font-mono text-sm" />
-                  </div>
-                </div>
-              )}
-
-              {provider === 'paystack' && (
-                <div className="grid md:grid-cols-2 gap-4 animate-in slide-in-from-top-2">
-                  <div>
-                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Public Key</label>
-                    <input type="text" value={paystackPk} onChange={(e) => setPaystackPk(e.target.value)} placeholder="pk_live_..." className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-accent font-mono text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Secret Key</label>
-                    <input type="password" value={paystackSk} onChange={(e) => setPaystackSk(e.target.value)} placeholder="sk_live_..." className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-accent font-mono text-sm" />
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-3 border-t border-gray-50 pt-6 mt-6">
-                {(stripePk || paystackPk) && (
-                  <button onClick={() => setIsEditingPayments(false)} className="px-5 py-2.5 text-gray-500 font-bold hover:bg-gray-50 rounded-xl transition-all">Cancel</button>
-                )}
-                <button onClick={handleSavePayments} disabled={isSavingPayments} className="flex items-center gap-2 px-6 py-2.5 bg-green-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-green-600/20 transition-all active:scale-95 disabled:opacity-50">
-                  <Lock size={16} /> {isSavingPayments ? 'Securing Vault...' : 'Lock Configuration'}
+              
+              {/* Type Toggle */}
+              <div className="flex gap-4 p-1 bg-gray-50 border border-gray-200 rounded-xl max-w-sm">
+                <button 
+                  type="button"
+                  onClick={() => setPayoutType('NGN')}
+                  className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${payoutType === 'NGN' ? 'bg-white shadow-sm text-navy' : 'text-gray-400 hover:text-navy'}`}
+                >
+                  Local Bank (NGN)
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setPayoutType('USD')}
+                  className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${payoutType === 'USD' ? 'bg-white shadow-sm text-navy' : 'text-gray-400 hover:text-navy'}`}
+                >
+                  US Bank / Payoneer
                 </button>
               </div>
+
+              {paymentError && (
+                <div className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-600 text-sm font-medium">
+                  <AlertCircle size={18} /> {paymentError}
+                </div>
+              )}
+
+              <form onSubmit={handleConnectBank} className="space-y-4">
+                {payoutType === 'NGN' ? (
+                  <div className="grid md:grid-cols-2 gap-4 animate-in slide-in-from-top-2">
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Select Bank</label>
+                      <select 
+                        required 
+                        value={payoutInfo.bank_code} 
+                        onChange={e => setPayoutInfo({...payoutInfo, bank_code: e.target.value})}
+                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-accent font-semibold text-sm appearance-none cursor-pointer"
+                      >
+                        <option value="">Choose a bank...</option>
+                        {NIGERIAN_BANKS.map(bank => <option key={bank.code} value={bank.code}>{bank.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Account Number</label>
+                      <input 
+                        type="text" 
+                        required 
+                        maxLength="10"
+                        placeholder="e.g. 0123456789" 
+                        value={payoutInfo.account_number} 
+                        onChange={e => setPayoutInfo({...payoutInfo, account_number: e.target.value.replace(/\D/g, '')})}
+                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-accent font-semibold text-sm" 
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid md:grid-cols-2 gap-4 animate-in slide-in-from-top-2">
+                    <div className="md:col-span-2">
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Bank Name</label>
+                      <input 
+                        type="text" 
+                        required 
+                        placeholder="e.g. First Century Bank (Payoneer)" 
+                        value={payoutInfo.bank_name} 
+                        onChange={e => setPayoutInfo({...payoutInfo, bank_name: e.target.value})}
+                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-accent font-semibold text-sm" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Account Number</label>
+                      <input 
+                        type="text" 
+                        required 
+                        placeholder="USD Account Number" 
+                        value={payoutInfo.account_number} 
+                        onChange={e => setPayoutInfo({...payoutInfo, account_number: e.target.value.replace(/\D/g, '')})}
+                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-accent font-semibold text-sm" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Routing Number / SWIFT</label>
+                      <input 
+                        type="text" 
+                        required 
+                        placeholder="ABA Routing or SWIFT Code" 
+                        value={payoutInfo.routing_number} 
+                        onChange={e => setPayoutInfo({...payoutInfo, routing_number: e.target.value})}
+                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-accent font-semibold text-sm" 
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center border-t border-gray-50 pt-6 mt-6">
+                  <div className="flex items-center gap-2 text-xs font-bold text-gray-400">
+                    <Shield size={14} /> Powered by Flutterwave
+                  </div>
+                  <button 
+                    type="submit" 
+                    disabled={isSavingPayments} 
+                    className="flex items-center justify-center gap-2 px-6 py-3 bg-navy text-white font-bold rounded-xl hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 min-w-[160px]"
+                  >
+                    {isSavingPayments ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/20 border-t-white"></div>
+                    ) : (
+                      <><Lock size={16} /> Connect Bank</>
+                    )}
+                  </button>
+                </div>
+              </form>
             </div>
           ) : (
-            // LOCKED VIEW (Also shown to non-admins as read-only)
+            // LOCKED VIEW (Active Subaccount)
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in duration-300">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center font-black text-navy text-xl uppercase">
-                  {provider === 'stripe' ? 'STR' : 'PAY'}
+                <div className="w-14 h-14 bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center text-green-500">
+                  <CheckCircle2 size={24} />
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Active Gateway</p>
-                  <p className="font-bold text-navy capitalize text-lg">{provider}</p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Status</p>
+                  <p className="font-bold text-navy text-lg">Active Subaccount</p>
                 </div>
               </div>
               
               <div className="text-left md:text-right">
                 <p className="text-[10px] font-black text-green-500 uppercase tracking-widest mb-2 flex items-center md:justify-end gap-1.5">
-                  <Lock size={12} /> Vault Secured
+                  <Shield size={12} /> Verified by Flutterwave
                 </p>
                 <div className="space-y-1">
-                  <p className="font-mono text-xs text-gray-500 bg-white border border-gray-100 px-3 py-1.5 rounded-md">
-                    PK: {provider === 'stripe' ? maskKey(stripePk) : maskKey(paystackPk)}
+                  <p className="font-bold text-sm text-navy">
+                    {payoutInfo.bank_name || 'Connected Bank'}
                   </p>
-                  <p className="font-mono text-xs text-gray-400 px-3 py-1">
-                    SK: ••••••••••••••••••••••••
+                  <p className="font-mono text-xs text-gray-500 bg-white border border-gray-100 px-3 py-1.5 rounded-md inline-block mt-1">
+                    ACCT: ••••••{payoutInfo.account_number?.slice(-4) || '••••'}
                   </p>
                 </div>
               </div>
