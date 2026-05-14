@@ -443,11 +443,21 @@ export default function Settings() {
                   <div className="text-left md:text-right flex flex-col items-start md:items-end gap-3">
                     <p className="font-bold text-sm text-navy">{ngnVault.bank_name}</p>
                     <p className="font-mono text-xs text-gray-500 bg-white border border-gray-100 px-3 py-1.5 rounded-md">ACCT: ••••••{ngnVault.account_number?.slice(-4) || '••••'}</p>
-                    {defaultCurrency !== 'NGN' && isAdminOrOwner && (
-                      <button onClick={() => handleSetDefault('NGN')} disabled={isSettingDefault} className="text-xs font-bold text-accent hover:text-accent/80 transition-colors flex items-center gap-1 mt-1">
-                        <Star size={14} /> Set as Default Route
+                    
+                    <div className="flex flex-col md:flex-row items-start md:items-center gap-3">
+                      <button 
+                        onClick={() => setNgnVault({ ...ngnVault, fw_subaccount_id: null })}
+                        className="text-xs font-bold text-gray-400 hover:text-red-500 transition-colors flex items-center gap-1"
+                      >
+                        <Edit2 size={12} /> Update Account
                       </button>
-                    )}
+
+                      {defaultCurrency !== 'NGN' && isAdminOrOwner && (
+                        <button onClick={() => handleSetDefault('NGN')} disabled={isSettingDefault} className="text-xs font-bold text-accent hover:text-accent/80 transition-colors flex items-center gap-1">
+                          <Star size={14} /> Set as Default Route
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -496,11 +506,21 @@ export default function Settings() {
                   <div className="text-left md:text-right flex flex-col items-start md:items-end gap-3">
                     <p className="font-bold text-sm text-navy">{usdVault.bank_name}</p>
                     <p className="font-mono text-xs text-gray-500 bg-white border border-gray-100 px-3 py-1.5 rounded-md">ACCT: ••••••{usdVault.account_number?.slice(-4) || '••••'}</p>
-                    {defaultCurrency !== 'USD' && isAdminOrOwner && (
-                      <button onClick={() => handleSetDefault('USD')} disabled={isSettingDefault} className="text-xs font-bold text-accent hover:text-accent/80 transition-colors flex items-center gap-1 mt-1">
-                        <Star size={14} /> Set as Default Route
+                    
+                    <div className="flex flex-col md:flex-row items-start md:items-end gap-3">
+                      <button 
+                        onClick={() => setUsdVault({ ...usdVault, fw_subaccount_id: null })}
+                        className="text-xs font-bold text-gray-400 hover:text-red-500 transition-colors flex items-center gap-1"
+                      >
+                        <Edit2 size={12} /> Update Account
                       </button>
-                    )}
+
+                      {defaultCurrency !== 'USD' && isAdminOrOwner && (
+                        <button onClick={() => handleSetDefault('USD')} disabled={isSettingDefault} className="text-xs font-bold text-accent hover:text-accent/80 transition-colors flex items-center gap-1">
+                          <Star size={14} /> Set as Default Route
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
