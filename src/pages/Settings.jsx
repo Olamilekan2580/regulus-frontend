@@ -195,24 +195,23 @@ export default function Settings() {
   };
 
   const handlePlanSelection = async (tier) => {
-    setIsProcessingUpgrade(true);
-    try {
-      const res = await api.post('/billing/subscribe', { 
-        plan_tier: tier, 
-        org_id: orgId 
-      });
+  setIsProcessingUpgrade(true);
+  try {
+    // This now hits the updated /subscribe route that returns a Flutterwave link
+    const res = await api.post('/billing/subscribe', { 
+      plan_tier: tier, 
+      org_id: orgId 
+    });
 
-      if (res.data?.url) {
-        window.location.href = res.data.url;
-      } else {
-        throw new Error('No checkout URL received.');
-      }
-    } catch (err) {
-      alert(err.response?.data?.error || 'Checkout failed to initialize.');
-    } finally {
-      setIsProcessingUpgrade(false);
+    if (res.data?.url) {
+      window.location.href = res.data.url; // Redirects to Flutterwave
     }
-  };
+  } catch (err) {
+    alert(err.response?.data?.error || 'Subscription failed to initialize.');
+  } finally {
+    setIsProcessingUpgrade(false);
+  }
+};
 
   if (isLoading) return <div className="flex justify-center p-12"><div className="animate-spin w-8 h-8 border-2 border-navy border-t-transparent rounded-full"></div></div>;
 

@@ -95,13 +95,15 @@ export default function Invoices() {
     };
   };
 
-  // 🔒 THE FIX: Scoped correctly outside of handleSubmit
-  const handleCopyLink = (id) => {
-    const publicUrl = `${window.location.origin}/invoices/${id}`;
-    navigator.clipboard.writeText(publicUrl);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
+  // Inside src/pages/Invoices.jsx
+
+const handleCopyLink = (id) => {
+  // THE FIX: Point to /pay/ instead of /invoices/
+  const publicUrl = `${window.location.origin}/pay/${id}`; 
+  navigator.clipboard.writeText(publicUrl);
+  setCopiedId(id);
+  setTimeout(() => setCopiedId(null), 2000);
+};
 
   // 🔒 THE FIX: Replaces updateStatus and talks directly to the DB
   const handleStatusChange = async (id, newStatus) => {

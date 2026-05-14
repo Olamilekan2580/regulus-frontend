@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { CheckCircle2, AlertCircle, UploadCloud, X, Send, Lock } from 'lucide-react';
 import api from '../lib/api';
 import { supabase } from '../lib/supabase';
 
 const PublicIntake = () => {
   const { token } = useParams();
-  const [project, setProject] = useState(null);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
@@ -19,7 +20,7 @@ const PublicIntake = () => {
     const fetchIntakeDetails = async () => {
       try {
         const res = await api.get(`/public/intake/${token}`);
-        setProject(res.data);
+        setData(res.data);
       } catch (err) {
         setError(err.response?.data?.error || 'Invalid or expired intake link.');
       } finally {
@@ -50,7 +51,7 @@ const PublicIntake = () => {
       // 1. Upload files to the secure Supabase bucket and get public URLs
       if (files.length > 0) {
         for (const file of files) {
-          // 🔒 THE FIX: Sanitize the file name to prevent the 400 Path Error
+          // 🔒 Sanitize the file name to prevent the 400 Path Error
           const fileExt = file.name.split('.').pop();
           const safeBaseName = file.name
             .split('.')[0]
@@ -68,7 +69,6 @@ const PublicIntake = () => {
             throw new Error(`Failed to upload ${file.name}`);
           }
 
-          // Generate the public URL so the freelancer can download it later
           const { data: publicUrlData } = supabase.storage
             .from('project-vault')
             .getPublicUrl(fileName);
@@ -77,16 +77,10 @@ const PublicIntake = () => {
         }
       }
 
-      // 2. Submit formatted data to the NEW backend route
-      // Format the text into a JSON object so it renders cleanly in the feed
-      const intakeData = {
-        project_requirements: requirements
-      };
-
-      // Hit the specific project submission endpoint
-      await api.post(`/projects/${project.id}/submissions`, { 
-        form_data: intakeData,
-        files: uploadedFileUrls
+      // 2. Submit formatted data to the NEW enterprise backend route
+      await api.post(`/public/intake/${token}`, { 
+        requirements: requirements,
+        assets: uploadedFileUrls
       });
 
       setSuccess(true);
@@ -102,69 +96,78 @@ const PublicIntake = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0A0F1E] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00C896]"></div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-navy"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#0A0F1E] flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-slate-900 border border-red-500/30 rounded-xl p-8 text-center shadow-2xl">
-          <svg className="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <h2 className="text-xl font-bold text-white mb-2">Access Denied</h2>
-          <p className="text-slate-400">{error}</p>
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white border border-red-100 rounded-[2rem] p-10 text-center shadow-xl">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-black text-navy mb-2">Access Denied</h2>
+          <p className="text-gray-500 font-medium">{error}</p>
         </div>
       </div>
     );
   }
 
+  const { project, organization } = data;
+  const brand = organization?.brand_settings || {};
+  const primaryColor = brand.primary || '#0A0F1E';
+  const accentColor = brand.accent || '#00C896';
+
   if (success) {
     return (
-      <div className="min-h-screen bg-[#0A0F1E] flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-slate-900 border border-[#00C896]/30 rounded-xl p-8 text-center shadow-2xl">
-          <div className="w-16 h-16 bg-[#00C896]/20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg className="w-8 h-8 text-[#00C896]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-            </svg>
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-[2rem] p-10 text-center shadow-xl animate-in zoom-in-95 duration-500">
+          <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 bg-green-50">
+            <CheckCircle2 size={40} className="text-green-500" />
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Details Received</h2>
-          <p className="text-slate-400">
-            Thank you! Your project requirements and files have been securely transmitted to your developer. You may now close this window.
+          <h2 className="text-2xl font-black text-navy mb-2">Details Received</h2>
+          <p className="text-gray-500 font-medium mb-8">
+            Your project requirements and files have been securely transmitted to {organization.name}. You may now close this window.
           </p>
+          <button 
+            onClick={() => window.close()} 
+            className="w-full py-4 text-white font-bold rounded-xl transition-all shadow-lg"
+            style={{ backgroundColor: primaryColor }}
+          >
+            Close Window
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0F1E] flex items-center justify-center p-4 py-12">
-      <div className="max-w-3xl w-full bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 py-12">
+      <div className="max-w-3xl w-full bg-white border border-gray-100 rounded-[2.5rem] shadow-2xl overflow-hidden">
         
-        {/* Header Section */}
-        <div className="bg-slate-800/50 p-8 border-b border-slate-800">
-          <div className="uppercase tracking-widest text-xs font-bold text-[#00C896] mb-2">Secure Client Portal</div>
-          <h1 className="text-3xl font-bold text-white mb-2">Project Intake: {project.name}</h1>
-          <p className="text-slate-400">
-            Welcome, {project.clients?.name || 'Client'}. Please provide the necessary details, credentials, and files required to commence development on your project.
+        {/* Dynamic Brand Header Section */}
+        <div className="p-10 text-white" style={{ backgroundColor: primaryColor }}>
+          <div className="uppercase tracking-[0.2em] text-[10px] font-black mb-2 opacity-70">Secure Client Portal</div>
+          <h1 className="text-3xl font-black mb-3">Project Intake: {project.name}</h1>
+          <p className="text-white/80 font-medium text-sm">
+            Welcome, {project.clients?.name || 'Client'}. Please provide the necessary details, credentials, and files required to commence development.
           </p>
         </div>
 
         {/* Form Section */}
-        <form onSubmit={handleSubmit} className="p-8 space-y-8">
+        <form onSubmit={handleSubmit} className="p-10 space-y-8">
           
           {/* Requirements Textarea */}
           <div>
-            <label className="block text-sm font-semibold text-slate-300 mb-2">
+            <label className="block text-xs uppercase tracking-widest font-black text-navy mb-3">
               Project Requirements & Objectives <span className="text-red-500">*</span>
             </label>
             <textarea
               required
               rows="6"
-              className="w-full bg-[#0A0F1E] border border-slate-700 rounded-xl p-4 text-white placeholder-slate-500 focus:outline-none focus:border-[#00C896] focus:ring-1 focus:ring-[#00C896] transition-colors"
+              className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-5 text-navy font-medium placeholder-gray-400 focus:outline-none focus:ring-2 transition-all resize-y"
+              style={{ '--tw-ring-color': accentColor }}
               placeholder="Describe your goals, required features, technical constraints, or target audience..."
               value={requirements}
               onChange={(e) => setRequirements(e.target.value)}
@@ -173,22 +176,20 @@ const PublicIntake = () => {
 
           {/* Secure File Upload */}
           <div>
-            <label className="block text-sm font-semibold text-slate-300 mb-2">
+            <label className="block text-xs uppercase tracking-widest font-black text-navy mb-3">
               Secure File Upload (Assets, PDFs, Mockups)
             </label>
-            <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-700 border-dashed rounded-xl hover:border-slate-500 transition-colors bg-[#0A0F1E]">
-              <div className="space-y-1 text-center">
-                <svg className="mx-auto h-12 w-12 text-slate-500" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                  <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <div className="flex text-sm text-slate-400 justify-center">
-                  <label htmlFor="file-upload" className="relative cursor-pointer bg-transparent rounded-md font-medium text-[#00C896] hover:text-[#00a87e] focus-within:outline-none">
+            <div className="mt-1 flex justify-center px-6 pt-8 pb-8 border-2 border-gray-200 border-dashed rounded-2xl hover:border-gray-300 transition-colors bg-gray-50">
+              <div className="space-y-2 text-center">
+                <UploadCloud className="mx-auto h-12 w-12 text-gray-400" />
+                <div className="flex text-sm text-gray-500 justify-center">
+                  <label htmlFor="file-upload" className="relative cursor-pointer rounded-md font-bold hover:opacity-80 transition-opacity" style={{ color: accentColor }}>
                     <span>Upload files</span>
                     <input id="file-upload" name="file-upload" type="file" multiple className="sr-only" onChange={handleFileChange} />
                   </label>
-                  <p className="pl-1">or drag and drop</p>
+                  <p className="pl-1 font-medium">or drag and drop</p>
                 </div>
-                <p className="text-xs text-slate-500">PNG, JPG, PDF, ZIP up to 50MB</p>
+                <p className="text-xs text-gray-400 font-medium">PNG, JPG, PDF, ZIP up to 50MB</p>
               </div>
             </div>
 
@@ -196,25 +197,37 @@ const PublicIntake = () => {
             {files.length > 0 && (
               <ul className="mt-4 space-y-2">
                 {files.map((file, index) => (
-                  <li key={index} className="flex items-center justify-between py-2 px-4 bg-slate-800 rounded-lg text-sm text-slate-300 border border-slate-700">
+                  <li key={index} className="flex items-center justify-between py-3 px-4 bg-white border border-gray-100 rounded-xl text-sm shadow-sm">
                     <div className="flex items-center truncate">
-                      <svg className="w-4 h-4 mr-2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
-                      <span className="truncate">{file.name}</span>
+                      <FileText className="w-4 h-4 mr-3 text-gray-400 shrink-0" />
+                      <span className="truncate font-bold text-navy">{file.name}</span>
                     </div>
-                    <button type="button" onClick={() => removeFile(index)} className="ml-4 text-red-400 hover:text-red-300 font-medium">Remove</button>
+                    <button type="button" onClick={() => removeFile(index)} className="ml-4 p-1 text-gray-400 hover:text-red-500 transition-colors">
+                      <X size={16} />
+                    </button>
                   </li>
                 ))}
               </ul>
             )}
           </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting || (!requirements.trim() && files.length === 0)}
-            className="w-full flex justify-center py-4 px-4 border border-transparent rounded-xl shadow-sm text-lg font-bold text-slate-900 bg-[#00C896] hover:bg-[#00a87e] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#0A0F1E] focus:ring-[#00C896] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? 'Encrypting & Submitting...' : 'Submit Project Details'}
-          </button>
+          <div className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-2 text-xs font-bold text-gray-400">
+              <Lock size={14} /> End-to-End Encrypted
+            </div>
+            <button
+              type="submit"
+              disabled={isSubmitting || (!requirements.trim() && files.length === 0)}
+              className="w-full sm:w-auto flex justify-center py-4 px-10 border border-transparent rounded-xl shadow-xl text-white font-black hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed items-center gap-2"
+              style={{ backgroundColor: accentColor }}
+            >
+              {isSubmitting ? (
+                <><div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white"></div> Processing...</>
+              ) : (
+                <><Send size={18} /> Submit Project Details</>
+              )}
+            </button>
+          </div>
         </form>
       </div>
     </div>
