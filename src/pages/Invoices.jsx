@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Receipt, Calendar, DollarSign, Download, Trash2, PlusCircle, AlertCircle } from 'lucide-react';
+import { Plus, Receipt, Calendar, DollarSign, Download, Trash2, PlusCircle, AlertCircle, Send, Link as LinkIcon, Check, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 
 const currencySymbols = {
@@ -11,18 +12,20 @@ const currencySymbols = {
 };
 
 export default function Invoices() {
+  const navigate = useNavigate();
   const [invoices, setInvoices] = useState([]);
   const [clients, setClients] = useState([]);
-  const [projects, setProjects] = useState([]); // NEW: Added Projects state
+  const [projects, setProjects] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [downloadingId, setDownloadingId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
   const [error, setError] = useState('');
   
   const [formData, setFormData] = useState({ 
     client_id: '', 
-    project_id: '', // NEW: Added Project ID mapping
+    project_id: '', 
     invoice_number: `INV-${Math.floor(1000 + Math.random() * 9000)}`, 
     currency: 'USD',
     status: 'Draft', 
@@ -38,7 +41,6 @@ export default function Invoices() {
         api.get('/projects').catch(() => ({ data: [] }))
       ]);
       
-      // 🔒 THE FIX: Safely unwrap the data regardless of how the backend sends it
       const safeInvoices = Array.isArray(invRes.data) ? invRes.data : (invRes.data?.data || []);
       const safeClients = Array.isArray(clientRes.data) ? clientRes.data : (clientRes.data?.data || []);
       const safeProjects = Array.isArray(projRes.data) ? projRes.data : (projRes.data?.data || []);
@@ -52,7 +54,7 @@ export default function Invoices() {
       }
     } catch (err) { 
       console.error('[Fetch Error]:', err); 
-      setInvoices([]); // Prevent crashes on error
+      setInvoices([]); 
     } finally { 
       setLoading(false); 
     }
@@ -93,6 +95,25 @@ export default function Invoices() {
     };
   };
 
+  // 🔒 THE FIX: Scoped correctly outside of handleSubmit
+  const handleCopyLink = (id) => {
+    const publicUrl = `${window.location.origin}/invoices/${id}`;
+    navigator.clipboard.writeText(publicUrl);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  // 🔒 THE FIX: Replaces updateStatus and talks directly to the DB
+  const handleStatusChange = async (id, newStatus) => {
+    try {
+      await api.put(`/invoices/${id}`, { status: newStatus });
+      fetchData(); 
+    } catch (err) {
+      console.error('Failed to update status', err);
+      alert('Failed to update invoice status.');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     const orgId = localStorage.getItem('current_org_id');
@@ -106,12 +127,10 @@ export default function Invoices() {
     setError('');
 
     try {
-      // 🔒 THE FIX: Strict Payload Sanitization
-      // PostgreSQL will crash if you send an empty string for a UUID foreign key. It MUST be null.
       const sanitizedPayload = {
         ...formData,
         org_id: orgId,
-        project_id: formData.project_id || null, // Convert empty string to null to prevent DB crash
+        project_id: formData.project_id || null, 
         total: calculateTotal(),
         line_items: formData.line_items.map(item => ({
           description: item.description,
@@ -138,17 +157,6 @@ export default function Invoices() {
       setError(err.response?.data?.error || 'Database execution failed. Please check your inputs.');
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const updateStatus = async (id, newStatus) => {
-    const orgId = localStorage.getItem('current_org_id');
-    try {
-      await api.put(`/invoices/${id}`, { status: newStatus, org_id: orgId });
-      setInvoices(invoices.map(inv => inv.id === id ? { ...inv, status: newStatus } : inv));
-    } catch (err) {
-      console.error('Failed to update status');
-      fetchData(); 
     }
   };
 
@@ -220,12 +228,17 @@ export default function Invoices() {
               <div key={invoice.id} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex flex-col h-full hover:border-accent/30 transition-colors group">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="font-bold text-lg text-navy group-hover:text-accent transition-colors">{invoice.invoice_number}</h3>
-                    <p className="text-sm text-gray-500 font-medium">{client.name}</p>
+                    <h3 className="font-bold text-lg text-navy group-hover:text-accent transition-colors">
+                      {invoice.invoice_number || `INV-${invoice.id.substring(0,4).toUpperCase()}`}
+                    </h3>
+                    <p className="text-sm text-gray-500 font-medium">
+                      {client.name}
+                    </p>
                   </div>
+                  
                   <select 
                     value={invoice.status}
-                    onChange={(e) => updateStatus(invoice.id, e.target.value)}
+                    onChange={(e) => handleStatusChange(invoice.id, e.target.value)}
                     className={`text-xs px-3 py-1.5 rounded-full font-bold border transition-all cursor-pointer outline-none appearance-none ${statusColors[invoice.status] || statusColors['Draft']}`}
                   >
                     <option value="Draft">Draft</option>
@@ -250,14 +263,32 @@ export default function Invoices() {
                     <Calendar size={14} /> {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'Upon receipt'}
                   </div>
                   
-                  <button
-                    onClick={() => handleDownload(invoice)}
-                    disabled={downloadingId === invoice.id}
-                    className="flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-accent transition-colors disabled:opacity-50"
-                  >
-                    {downloadingId === invoice.id ? <div className="w-3 h-3 border-2 border-accent border-t-transparent animate-spin rounded-full" /> : <Download size={14} />}
-                    {downloadingId === invoice.id ? 'SYNK' : 'PDF'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleDownload(invoice)}
+                      disabled={downloadingId === invoice.id}
+                      className="flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-accent transition-colors disabled:opacity-50 px-2 py-1.5"
+                      title="Download PDF"
+                    >
+                      {downloadingId === invoice.id ? <div className="w-3 h-3 border-2 border-accent border-t-transparent animate-spin rounded-full" /> : <Download size={14} />}
+                      {downloadingId === invoice.id ? 'SYNK' : 'PDF'}
+                    </button>
+
+                    <button 
+                      onClick={() => handleCopyLink(invoice.id)}
+                      className="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-navy transition-colors"
+                      title="Copy Public Link"
+                    >
+                      {copiedId === invoice.id ? <Check size={14} className="text-green-500" /> : <LinkIcon size={14} />}
+                    </button>
+                    
+                    <button 
+                      onClick={() => navigate(`/invoices/${invoice.id}`)}
+                      className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      <Send size={14} /> View / Pay
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -266,95 +297,104 @@ export default function Invoices() {
       )}
       
       {isModalOpen && (
-        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl p-8 w-full max-w-3xl shadow-2xl animate-in zoom-in-95 duration-200 my-8">
-            <h2 className="text-2xl font-bold text-navy mb-2">Create Invoice</h2>
-            <p className="text-sm text-gray-500 mb-6 font-medium">Add specific deliverables, hours, or services.</p>
-
-            {error && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-600 text-sm font-medium animate-in slide-in-from-top-2">
-                <AlertCircle size={18} />
-                {error}
-              </div>
-            )}
+        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 relative overflow-hidden">
             
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* THE GRID FIX: Added Project Selection */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Select Client</label>
-                  <select required className="w-full bg-gray-50 border border-gray-100 p-3 rounded-xl outline-none focus:ring-2 focus:ring-accent/20 transition-all font-semibold text-sm appearance-none" value={formData.client_id} onChange={e => setFormData({...formData, client_id: e.target.value})}>
-                    {clients.map(c => <option key={c.id} value={c.id}>{c.company || c.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Select Project</label>
-                  <select className="w-full bg-gray-50 border border-gray-100 p-3 rounded-xl outline-none focus:ring-2 focus:ring-accent/20 transition-all font-semibold text-sm appearance-none" value={formData.project_id} onChange={e => setFormData({...formData, project_id: e.target.value})}>
-                    <option value="">No Project Attached</option>
-                    {projects.map(p => <option key={p.id} value={p.id}>{p.title || p.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Due Date</label>
-                  <input type="date" required className="w-full bg-gray-50 border border-gray-100 p-3 rounded-xl font-semibold text-sm outline-none focus:ring-2 focus:ring-accent/20 transition-all" value={formData.due_date} onChange={e => setFormData({...formData, due_date: e.target.value})} />
-                </div>
+            <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 shrink-0">
+              <div>
+                <h2 className="text-2xl font-bold text-navy">Create Invoice</h2>
+                <p className="text-sm text-gray-500 font-medium">Add specific deliverables, hours, or services.</p>
               </div>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-navy transition-colors bg-white rounded-full p-1 border border-gray-200 shadow-sm">
+                <X size={20} />
+              </button>
+            </div>
 
-              <div className="mt-8">
-                <div className="flex justify-between items-center mb-4">
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Line Items</label>
-                  <select className="bg-gray-50 border border-gray-100 px-3 py-1 rounded-lg text-xs font-bold outline-none cursor-pointer" value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value})}>
-                    {Object.keys(currencySymbols).map(code => <option key={code} value={code}>{code} ({currencySymbols[code]})</option>)}
-                  </select>
+            <div className="p-6 overflow-y-auto flex-1">
+              {error && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-600 text-sm font-medium animate-in slide-in-from-top-2">
+                  <AlertCircle size={18} />
+                  {error}
+                </div>
+              )}
+              
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Select Client</label>
+                    <select required className="w-full bg-gray-50 border border-gray-100 p-3 rounded-xl outline-none focus:ring-2 focus:ring-accent/20 transition-all font-semibold text-sm appearance-none" value={formData.client_id} onChange={e => setFormData({...formData, client_id: e.target.value})}>
+                      {clients.map(c => <option key={c.id} value={c.id}>{c.company || c.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Select Project</label>
+                    <select className="w-full bg-gray-50 border border-gray-100 p-3 rounded-xl outline-none focus:ring-2 focus:ring-accent/20 transition-all font-semibold text-sm appearance-none" value={formData.project_id} onChange={e => setFormData({...formData, project_id: e.target.value})}>
+                      <option value="">No Project Attached</option>
+                      {projects.map(p => <option key={p.id} value={p.id}>{p.title || p.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Due Date</label>
+                    <input type="date" required className="w-full bg-gray-50 border border-gray-100 p-3 rounded-xl font-semibold text-sm outline-none focus:ring-2 focus:ring-accent/20 transition-all" value={formData.due_date} onChange={e => setFormData({...formData, due_date: e.target.value})} />
+                  </div>
                 </div>
 
-                <div className="space-y-3">
-                  {formData.line_items.map((item, index) => (
-                    <div key={index} className="flex flex-col sm:flex-row gap-3 items-start group">
-                      <div className="flex-1 w-full">
-                        <input type="text" placeholder="Description (e.g., API Integration)" required className="w-full border border-gray-200 p-3 rounded-xl text-sm outline-none focus:border-accent transition-colors" value={item.description} onChange={e => handleLineItemChange(index, 'description', e.target.value)} />
-                      </div>
-                      <div className="flex gap-3 w-full sm:w-auto">
-                        <div className="w-24 shrink-0">
-                          <input type="number" min="1" step="0.5" placeholder="Qty" required className="w-full border border-gray-200 p-3 rounded-xl text-sm text-center outline-none focus:border-accent transition-colors" value={item.quantity} onChange={e => handleLineItemChange(index, 'quantity', e.target.value)} />
+                <div className="mt-8">
+                  <div className="flex justify-between items-center mb-4">
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Line Items</label>
+                    <select className="bg-gray-50 border border-gray-100 px-3 py-1 rounded-lg text-xs font-bold outline-none cursor-pointer" value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value})}>
+                      {Object.keys(currencySymbols).map(code => <option key={code} value={code}>{code} ({currencySymbols[code]})</option>)}
+                    </select>
+                  </div>
+
+                  <div className="space-y-3">
+                    {formData.line_items.map((item, index) => (
+                      <div key={index} className="flex flex-col sm:flex-row gap-3 items-start group">
+                        <div className="flex-1 w-full">
+                          <input type="text" placeholder="Description (e.g., API Integration)" required className="w-full border border-gray-200 p-3 rounded-xl text-sm outline-none focus:border-accent transition-colors" value={item.description} onChange={e => handleLineItemChange(index, 'description', e.target.value)} />
                         </div>
-                        <div className="w-32 shrink-0">
-                          <input type="number" min="0" step="0.01" placeholder="Rate" required className="w-full border border-gray-200 p-3 rounded-xl text-sm text-right outline-none focus:border-accent transition-colors" value={item.rate} onChange={e => handleLineItemChange(index, 'rate', e.target.value)} />
+                        <div className="flex gap-3 w-full sm:w-auto">
+                          <div className="w-24 shrink-0">
+                            <input type="number" min="1" step="0.5" placeholder="Qty" required className="w-full border border-gray-200 p-3 rounded-xl text-sm text-center outline-none focus:border-accent transition-colors" value={item.quantity} onChange={e => handleLineItemChange(index, 'quantity', e.target.value)} />
+                          </div>
+                          <div className="w-32 shrink-0">
+                            <input type="number" min="0" step="0.01" placeholder="Rate" required className="w-full border border-gray-200 p-3 rounded-xl text-sm text-right outline-none focus:border-accent transition-colors" value={item.rate} onChange={e => handleLineItemChange(index, 'rate', e.target.value)} />
+                          </div>
+                          <button type="button" onClick={() => handleRemoveLineItem(index)} disabled={formData.line_items.length === 1} className="p-3 text-gray-300 hover:text-red-500 transition-colors disabled:opacity-30 shrink-0">
+                            <Trash2 size={20} />
+                          </button>
                         </div>
-                        <button type="button" onClick={() => handleRemoveLineItem(index)} disabled={formData.line_items.length === 1} className="p-3 text-gray-300 hover:text-red-500 transition-colors disabled:opacity-30 shrink-0">
-                          <Trash2 size={20} />
-                        </button>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+
+                  <button type="button" onClick={handleAddLineItem} className="mt-4 flex items-center gap-2 text-sm font-bold text-accent hover:text-accent/80 transition-colors">
+                    <PlusCircle size={16} /> Add Item
+                  </button>
                 </div>
 
-                <button type="button" onClick={handleAddLineItem} className="mt-4 flex items-center gap-2 text-sm font-bold text-accent hover:text-accent/80 transition-colors">
-                  <PlusCircle size={16} /> Add Item
-                </button>
-              </div>
+                <div className="bg-gray-50 p-6 rounded-xl flex justify-between items-center mt-6 border border-gray-100">
+                  <span className="text-gray-500 font-bold uppercase text-sm tracking-wider">Total</span>
+                  <span className="text-2xl font-black text-navy">{currencySymbols[formData.currency] || '$'}{calculateTotal().toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                </div>
 
-              <div className="bg-gray-50 p-6 rounded-xl flex justify-between items-center mt-6 border border-gray-100">
-                <span className="text-gray-500 font-bold uppercase text-sm tracking-wider">Total</span>
-                <span className="text-2xl font-black text-navy">{currencySymbols[formData.currency] || '$'}{calculateTotal().toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-6 border-t border-gray-50">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-sm font-bold text-gray-400 hover:text-navy transition-colors">Discard</button>
-                <button 
-                  type="submit" 
-                  disabled={isSubmitting}
-                  className="px-8 py-2.5 bg-navy text-white rounded-xl font-bold hover:shadow-lg hover:shadow-navy/20 transition-all active:scale-95 disabled:opacity-70 flex items-center gap-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      Generating...
-                    </>
-                  ) : 'Generate Invoice'}
-                </button>
-              </div>
-            </form>
+                <div className="flex justify-end gap-3 pt-6 border-t border-gray-50 mt-4">
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-sm font-bold text-gray-400 hover:text-navy transition-colors">Discard</button>
+                  <button 
+                    type="submit" 
+                    disabled={isSubmitting}
+                    className="px-8 py-2.5 bg-navy text-white rounded-xl font-bold hover:shadow-lg hover:shadow-navy/20 transition-all active:scale-95 disabled:opacity-70 flex items-center gap-2"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        Generating...
+                      </>
+                    ) : 'Generate Invoice'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

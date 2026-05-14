@@ -25,6 +25,8 @@ import PublicIntake from './pages/PublicIntake';
 import PublicTimeline from './pages/PublicTimeline';
 import AutomationHub from './pages/AutomationHub';
 import ProposalView from './pages/ProposalView';
+// 🔒 THE FIX: Import the Invoice View
+import InvoiceView from './pages/InvoiceView';
 
 export default function App() {
   const [isRouting, setIsRouting] = useState(true);
@@ -99,11 +101,12 @@ export default function App() {
       {/* 🟢 PUBLIC ROUTES (No login required) */}
       <Route path="/login" element={<Login />} />
       <Route path="/p/:id" element={<ProposalView />} />
+      {/* 🔒 THE FIX: Map the public invoice gateway so clients can pay without logging in */}
+      <Route path="/invoices/:id" element={<InvoiceView />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/portal/:token" element={<ClientPortal />} />
       <Route path="/secret/:id" element={<SecretReveal />} />
       
-      {/* 🔒 THE FIX: Moved these out of the Protected Route block */}
       <Route path="/public/intake/:token" element={<PublicIntake />} />
       <Route path="/public/updates/:token" element={<PublicTimeline />} />
       
@@ -133,7 +136,6 @@ export default function App() {
         <Route path="projects" element={<Projects />} />
         <Route path="invoices" element={<Invoices />} />
         <Route path="proposals" element={<Proposals />} />
-        {/* 🔒 THE FIX: Added the ProposalView route here */}
         <Route path="proposals/:id" element={<ProposalView />} />
         <Route path="infrastructure" element={<Infrastructure />} />
         <Route path="profile" element={<Profile />} />
