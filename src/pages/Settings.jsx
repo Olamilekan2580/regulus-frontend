@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Palette, Trash2, ShieldAlert, CreditCard, Copy, Crown, Lock, Edit2, CheckCircle2, Zap, GitBranch, Shield, AlertCircle } from 'lucide-react';
+import { Users, Palette, Trash2, ShieldAlert, CreditCard, Copy, Crown, Lock, Edit2, CheckCircle2, Zap, GitBranch, Shield, AlertCircle, Star } from 'lucide-react';
 import InviteModal from '../components/InviteModal';
 import api from '../lib/api';
 import DomainManager from '../components/DomainManager';
@@ -36,18 +36,20 @@ export default function Settings() {
   const [accentColor, setAccentColor] = useState('#00C896');
   const [isSavingTheme, setIsSavingTheme] = useState(false);
 
-  // Payout Configuration States (Flutterwave Subaccounts)
-  const [payoutType, setPayoutType] = useState('NGN'); // 'NGN' or 'USD'
-  const [payoutInfo, setPayoutInfo] = useState({
-    bank_code: '',
-    account_number: '',
-    routing_number: '',
-    swift_code: '',
-    bank_name: '',
-    fw_subaccount_id: null
+  // Multi-Currency Payout States
+  const [activeTab, setActiveTab] = useState('NGN');
+  const [defaultCurrency, setDefaultCurrency] = useState('NGN');
+  const [isSettingDefault, setIsSettingDefault] = useState(false);
+
+  const [ngnVault, setNgnVault] = useState({
+    fw_subaccount_id: null, bank_code: '', account_number: '', bank_name: ''
   });
+  
+  const [usdVault, setUsdVault] = useState({
+    fw_subaccount_id: null, routing_number: '', account_number: '', bank_name: ''
+  });
+
   const [isSavingPayments, setIsSavingPayments] = useState(false);
-  const [isEditingPayments, setIsEditingPayments] = useState(true);
   const [paymentError, setPaymentError] = useState('');
   const [paymentSuccess, setPaymentSuccess] = useState('');
 
@@ -72,7 +74,6 @@ export default function Settings() {
         const data = brandRes.data;
         setOrgData(data);
 
-        // Load GitHub Handle
         if (data?.github_handle) {
           setGithubHandle(data.github_handle);
         }
@@ -83,17 +84,22 @@ export default function Settings() {
           if (brand.accent) setAccentColor(brand.accent);
         }
 
-        // Load Flutterwave Subaccount Status
-        if (data?.fw_subaccount_id) {
-          setPayoutInfo(prev => ({ 
-            ...prev, 
-            fw_subaccount_id: data.fw_subaccount_id,
-            account_number: data.account_number || '',
-            bank_name: data.bank_name || ''
-          }));
-          setIsEditingPayments(false);
-        }
+        // Hydrate Dual Vaults
+        setNgnVault(prev => ({
+          ...prev,
+          fw_subaccount_id: data?.fw_subaccount_ngn || null,
+          account_number: data?.ngn_account_number || '',
+          bank_name: data?.ngn_bank_name || ''
+        }));
 
+        setUsdVault(prev => ({
+          ...prev,
+          fw_subaccount_id: data?.fw_subaccount_usd || null,
+          account_number: data?.usd_account_number || '',
+          bank_name: data?.usd_bank_name || ''
+        }));
+
+        setDefaultCurrency(data?.default_payout_currency || 'NGN');
         setMembers(teamRes.data || []);
       } catch (err) {
         console.error('Failed to fetch workspace data:', err);
@@ -118,33 +124,50 @@ export default function Settings() {
     }
   };
 
-  const handleConnectBank = async (e) => {
+  const handleConnectBank = async (e, type) => {
     e.preventDefault();
     setPaymentError('');
     setPaymentSuccess('');
     setIsSavingPayments(true);
 
     try {
-      const selectedBank = payoutType === 'NGN' 
-        ? NIGERIAN_BANKS.find(b => b.code === payoutInfo.bank_code)?.name 
-        : payoutInfo.bank_name;
+      const activeData = type === 'NGN' ? ngnVault : usdVault;
+      const selectedBank = type === 'NGN' 
+        ? NIGERIAN_BANKS.find(b => b.code === activeData.bank_code)?.name 
+        : activeData.bank_name;
 
       const payload = {
         org_id: orgId,
-        payout_type: payoutType,
+        payout_type: type,
         bank_name: selectedBank,
-        ...payoutInfo
+        ...activeData
       };
 
       const res = await api.post(`/payouts/connect`, payload);
       
-      setPayoutInfo(prev => ({ ...prev, fw_subaccount_id: res.data.subaccount_id }));
-      setPaymentSuccess('Bank account verified and connected to Flutterwave successfully.');
-      setIsEditingPayments(false);
+      if (type === 'NGN') {
+        setNgnVault(prev => ({ ...prev, fw_subaccount_id: res.data.subaccount_id, bank_name: selectedBank }));
+      } else {
+        setUsdVault(prev => ({ ...prev, fw_subaccount_id: res.data.subaccount_id, bank_name: selectedBank }));
+      }
+      setPaymentSuccess(`${type} bank account verified and locked.`);
     } catch (err) {
-      setPaymentError(err.response?.data?.error || 'Failed to verify bank account with Flutterwave.');
+      setPaymentError(err.response?.data?.error || `Failed to verify ${type} account with Flutterwave.`);
     } finally {
       setIsSavingPayments(false);
+    }
+  };
+
+  const handleSetDefault = async (currency) => {
+    if (defaultCurrency === currency) return;
+    setIsSettingDefault(true);
+    try {
+      await api.put(`/payouts/default`, { org_id: orgId, default_currency: currency });
+      setDefaultCurrency(currency);
+    } catch (err) {
+      alert('Failed to update default routing.');
+    } finally {
+      setIsSettingDefault(false);
     }
   };
 
@@ -339,155 +362,148 @@ export default function Settings() {
           </div>
         </section>
 
-        {/* PAYOUT CONFIGURATION (Replaces Payment Vault) */}
+        {/* MULTI-CURRENCY PAYOUT VAULT */}
         <section className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-100 text-green-600 rounded-lg"><CreditCard size={20} /></div>
               <div>
-                <h2 className="text-xl font-bold text-navy">Payout Configuration</h2>
-                <p className="text-sm text-gray-500 font-medium mt-1">Connect your bank account or Payoneer to receive automated payouts.</p>
+                <h2 className="text-xl font-bold text-navy">Global Payout Vault</h2>
+                <p className="text-sm text-gray-500 font-medium mt-1">Manage your local and international settlement accounts.</p>
               </div>
             </div>
           </div>
           
-          {isEditingPayments && isAdminOrOwner ? (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              
-              {/* Type Toggle */}
-              <div className="flex gap-4 p-1 bg-gray-50 border border-gray-200 rounded-xl max-w-sm">
-                <button 
-                  type="button"
-                  onClick={() => setPayoutType('NGN')}
-                  className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${payoutType === 'NGN' ? 'bg-white shadow-sm text-navy' : 'text-gray-400 hover:text-navy'}`}
-                >
-                  Local Bank (NGN)
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => setPayoutType('USD')}
-                  className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${payoutType === 'USD' ? 'bg-white shadow-sm text-navy' : 'text-gray-400 hover:text-navy'}`}
-                >
-                  US Bank / Payoneer
-                </button>
-              </div>
+          {/* Dual-Vault Toggle */}
+          <div className="flex gap-4 p-1 bg-gray-50 border border-gray-200 rounded-xl max-w-md mb-6">
+            <button 
+              onClick={() => setActiveTab('NGN')} 
+              className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'NGN' ? 'bg-white shadow-sm text-navy' : 'text-gray-400 hover:text-navy'}`}
+            >
+              Local Bank (NGN) {defaultCurrency === 'NGN' && <Star size={14} className="text-accent fill-accent" />}
+            </button>
+            <button 
+              onClick={() => setActiveTab('USD')} 
+              className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'USD' ? 'bg-white shadow-sm text-navy' : 'text-gray-400 hover:text-navy'}`}
+            >
+              US / Payoneer (USD) {defaultCurrency === 'USD' && <Star size={14} className="text-accent fill-accent" />}
+            </button>
+          </div>
 
-              {paymentError && (
-                <div className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-600 text-sm font-medium">
-                  <AlertCircle size={18} /> {paymentError}
-                </div>
-              )}
+          {paymentError && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-600 text-sm font-medium">
+              <AlertCircle size={18} /> {paymentError}
+            </div>
+          )}
+          
+          {paymentSuccess && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-100 rounded-xl flex items-center gap-3 text-green-600 text-sm font-medium">
+              <CheckCircle2 size={18} /> {paymentSuccess}
+            </div>
+          )}
 
-              <form onSubmit={handleConnectBank} className="space-y-4">
-                {payoutType === 'NGN' ? (
-                  <div className="grid md:grid-cols-2 gap-4 animate-in slide-in-from-top-2">
+          {/* NGN TAB */}
+          {activeTab === 'NGN' && (
+            <div className="animate-in fade-in duration-300">
+              {!ngnVault.fw_subaccount_id ? (
+                <form onSubmit={(e) => handleConnectBank(e, 'NGN')} className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Select Bank</label>
-                      <select 
-                        required 
-                        value={payoutInfo.bank_code} 
-                        onChange={e => setPayoutInfo({...payoutInfo, bank_code: e.target.value})}
-                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-accent font-semibold text-sm appearance-none cursor-pointer"
-                      >
+                      <select required value={ngnVault.bank_code} onChange={e => setNgnVault({...ngnVault, bank_code: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-accent font-semibold text-sm cursor-pointer">
                         <option value="">Choose a bank...</option>
                         {NIGERIAN_BANKS.map(bank => <option key={bank.code} value={bank.code}>{bank.name}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Account Number</label>
-                      <input 
-                        type="text" 
-                        required 
-                        maxLength="10"
-                        placeholder="e.g. 0123456789" 
-                        value={payoutInfo.account_number} 
-                        onChange={e => setPayoutInfo({...payoutInfo, account_number: e.target.value.replace(/\D/g, '')})}
-                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-accent font-semibold text-sm" 
-                      />
+                      <input type="text" required maxLength="10" placeholder="e.g. 0123456789" value={ngnVault.account_number} onChange={e => setNgnVault({...ngnVault, account_number: e.target.value.replace(/\D/g, '')})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-accent font-semibold text-sm" />
                     </div>
                   </div>
-                ) : (
-                  <div className="grid md:grid-cols-2 gap-4 animate-in slide-in-from-top-2">
+                  <div className="flex justify-between items-center border-t border-gray-50 pt-6 mt-6">
+                    <div className="flex items-center gap-2 text-xs font-bold text-gray-400">
+                      <Shield size={14} /> Powered by Flutterwave
+                    </div>
+                    <button type="submit" disabled={isSavingPayments} className="flex items-center justify-center gap-2 px-6 py-3 bg-navy text-white font-bold rounded-xl hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 min-w-[160px]">
+                      {isSavingPayments ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/20 border-t-white"></div> : <><Lock size={16} /> Connect NGN Vault</>}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center text-green-500">
+                      <CheckCircle2 size={24} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Status</p>
+                      <p className="font-bold text-navy text-lg">Active NGN Subaccount</p>
+                    </div>
+                  </div>
+                  <div className="text-left md:text-right flex flex-col items-start md:items-end gap-3">
+                    <p className="font-bold text-sm text-navy">{ngnVault.bank_name}</p>
+                    <p className="font-mono text-xs text-gray-500 bg-white border border-gray-100 px-3 py-1.5 rounded-md">ACCT: ••••••{ngnVault.account_number?.slice(-4) || '••••'}</p>
+                    {defaultCurrency !== 'NGN' && isAdminOrOwner && (
+                      <button onClick={() => handleSetDefault('NGN')} disabled={isSettingDefault} className="text-xs font-bold text-accent hover:text-accent/80 transition-colors flex items-center gap-1 mt-1">
+                        <Star size={14} /> Set as Default Route
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* USD TAB */}
+          {activeTab === 'USD' && (
+            <div className="animate-in fade-in duration-300">
+              {!usdVault.fw_subaccount_id ? (
+                <form onSubmit={(e) => handleConnectBank(e, 'USD')} className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                       <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Bank Name</label>
-                      <input 
-                        type="text" 
-                        required 
-                        placeholder="e.g. First Century Bank (Payoneer)" 
-                        value={payoutInfo.bank_name} 
-                        onChange={e => setPayoutInfo({...payoutInfo, bank_name: e.target.value})}
-                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-accent font-semibold text-sm" 
-                      />
+                      <input type="text" required placeholder="e.g. First Century Bank (Payoneer)" value={usdVault.bank_name} onChange={e => setUsdVault({...usdVault, bank_name: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-accent font-semibold text-sm" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Account Number</label>
-                      <input 
-                        type="text" 
-                        required 
-                        placeholder="USD Account Number" 
-                        value={payoutInfo.account_number} 
-                        onChange={e => setPayoutInfo({...payoutInfo, account_number: e.target.value.replace(/\D/g, '')})}
-                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-accent font-semibold text-sm" 
-                      />
+                      <input type="text" required placeholder="USD Account Number" value={usdVault.account_number} onChange={e => setUsdVault({...usdVault, account_number: e.target.value.replace(/\D/g, '')})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-accent font-semibold text-sm" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Routing Number / SWIFT</label>
-                      <input 
-                        type="text" 
-                        required 
-                        placeholder="ABA Routing or SWIFT Code" 
-                        value={payoutInfo.routing_number} 
-                        onChange={e => setPayoutInfo({...payoutInfo, routing_number: e.target.value})}
-                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-accent font-semibold text-sm" 
-                      />
+                      <input type="text" required placeholder="ABA Routing or SWIFT Code" value={usdVault.routing_number} onChange={e => setUsdVault({...usdVault, routing_number: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-accent font-semibold text-sm" />
                     </div>
                   </div>
-                )}
-
-                <div className="flex justify-between items-center border-t border-gray-50 pt-6 mt-6">
-                  <div className="flex items-center gap-2 text-xs font-bold text-gray-400">
-                    <Shield size={14} /> Powered by Flutterwave
+                  <div className="flex justify-between items-center border-t border-gray-50 pt-6 mt-6">
+                    <div className="flex items-center gap-2 text-xs font-bold text-gray-400">
+                      <Shield size={14} /> Powered by Flutterwave
+                    </div>
+                    <button type="submit" disabled={isSavingPayments} className="flex items-center justify-center gap-2 px-6 py-3 bg-navy text-white font-bold rounded-xl hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 min-w-[160px]">
+                      {isSavingPayments ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/20 border-t-white"></div> : <><Lock size={16} /> Connect USD Vault</>}
+                    </button>
                   </div>
-                  <button 
-                    type="submit" 
-                    disabled={isSavingPayments} 
-                    className="flex items-center justify-center gap-2 px-6 py-3 bg-navy text-white font-bold rounded-xl hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 min-w-[160px]"
-                  >
-                    {isSavingPayments ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/20 border-t-white"></div>
-                    ) : (
-                      <><Lock size={16} /> Connect Bank</>
+                </form>
+              ) : (
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center text-green-500">
+                      <CheckCircle2 size={24} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Status</p>
+                      <p className="font-bold text-navy text-lg">Active USD Subaccount</p>
+                    </div>
+                  </div>
+                  <div className="text-left md:text-right flex flex-col items-start md:items-end gap-3">
+                    <p className="font-bold text-sm text-navy">{usdVault.bank_name}</p>
+                    <p className="font-mono text-xs text-gray-500 bg-white border border-gray-100 px-3 py-1.5 rounded-md">ACCT: ••••••{usdVault.account_number?.slice(-4) || '••••'}</p>
+                    {defaultCurrency !== 'USD' && isAdminOrOwner && (
+                      <button onClick={() => handleSetDefault('USD')} disabled={isSettingDefault} className="text-xs font-bold text-accent hover:text-accent/80 transition-colors flex items-center gap-1 mt-1">
+                        <Star size={14} /> Set as Default Route
+                      </button>
                     )}
-                  </button>
+                  </div>
                 </div>
-              </form>
-            </div>
-          ) : (
-            // LOCKED VIEW (Active Subaccount)
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in duration-300">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center text-green-500">
-                  <CheckCircle2 size={24} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Status</p>
-                  <p className="font-bold text-navy text-lg">Active Subaccount</p>
-                </div>
-              </div>
-              
-              <div className="text-left md:text-right">
-                <p className="text-[10px] font-black text-green-500 uppercase tracking-widest mb-2 flex items-center md:justify-end gap-1.5">
-                  <Shield size={12} /> Verified by Flutterwave
-                </p>
-                <div className="space-y-1">
-                  <p className="font-bold text-sm text-navy">
-                    {payoutInfo.bank_name || 'Connected Bank'}
-                  </p>
-                  <p className="font-mono text-xs text-gray-500 bg-white border border-gray-100 px-3 py-1.5 rounded-md inline-block mt-1">
-                    ACCT: ••••••{payoutInfo.account_number?.slice(-4) || '••••'}
-                  </p>
-                </div>
-              </div>
+              )}
             </div>
           )}
         </section>
