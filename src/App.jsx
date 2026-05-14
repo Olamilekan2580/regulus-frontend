@@ -106,6 +106,8 @@ export default function App() {
       <Route path="/signup" element={<Signup />} />
       <Route path="/portal/:token" element={<ClientPortal />} />
       <Route path="/secret/:id" element={<SecretReveal />} />
+      <Route path="/pay/:id" element={<PublicCheckout />} />
+      <Route path="/pay/success" element={<PaymentSuccess />} />
       
       <Route path="/public/intake/:token" element={<PublicIntake />} />
       <Route path="/public/updates/:token" element={<PublicTimeline />} />
