@@ -25,8 +25,9 @@ import PublicIntake from './pages/PublicIntake';
 import PublicTimeline from './pages/PublicTimeline';
 import AutomationHub from './pages/AutomationHub';
 import ProposalView from './pages/ProposalView';
-// 🔒 THE FIX: Import the Invoice View
 import InvoiceView from './pages/InvoiceView';
+import PublicCheckout from './pages/PublicCheckout';
+import PaymentSuccess from './pages/PaymentSuccess';
 
 export default function App() {
   const [isRouting, setIsRouting] = useState(true);
@@ -35,11 +36,11 @@ export default function App() {
   useEffect(() => {
     const routeEdgeRequest = async () => {
       const hostname = window.location.hostname;
-      
+
       // 1. Bypass interceptor for localhost or your base Vercel domain
       if (
-        hostname === 'localhost' || 
-        hostname === '127.0.0.1' || 
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
         hostname.includes('vercel.app')
       ) {
         setIsRouting(false);
@@ -53,17 +54,20 @@ export default function App() {
 
         // 3. Inject the white-label environment
         if (org && org.brand_settings) {
-          const brand = typeof org.brand_settings === 'string' ? JSON.parse(org.brand_settings) : org.brand_settings;
+          const brand =
+            typeof org.brand_settings === 'string'
+              ? JSON.parse(org.brand_settings)
+              : org.brand_settings;
           const root = document.documentElement;
-          
+
           if (brand.primary) root.style.setProperty('--theme-navy', brand.primary);
           if (brand.accent) root.style.setProperty('--theme-accent', brand.accent);
-          
+
           // Save the tenant ID so the login screen knows which agency this user belongs to
           localStorage.setItem('tenant_org_id', org.id);
           localStorage.setItem('tenant_org_name', org.name);
         }
-        
+
         setIsRouting(false);
       } catch (err) {
         console.error('Unregistered Domain Request:', hostname);
@@ -90,7 +94,10 @@ export default function App() {
       <div className="min-h-screen bg-[#0A0F1E] flex items-center justify-center p-4">
         <div className="text-center text-white max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
           <h1 className="text-2xl font-black mb-2">Workspace Not Found</h1>
-          <p className="text-slate-400 text-sm">This domain is not registered on our edge network. Please check your DNS settings or contact support.</p>
+          <p className="text-slate-400 text-sm">
+            This domain is not registered on our edge network. Please check your DNS
+            settings or contact support.
+          </p>
         </div>
       </div>
     );
@@ -100,39 +107,44 @@ export default function App() {
     <Routes>
       {/* 🟢 PUBLIC ROUTES (No login required) */}
       <Route path="/login" element={<Login />} />
-      <Route path="/p/:id" element={<ProposalView />} />
-      {/* 🔒 THE FIX: Map the public invoice gateway so clients can pay without logging in */}
-      <Route path="/invoices/:id" element={<InvoiceView />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/portal/:token" element={<ClientPortal />} />
       <Route path="/secret/:id" element={<SecretReveal />} />
-      <Route path="/pay/:id" element={<PublicCheckout />} />
+      <Route path="/p/:id" element={<ProposalView />} />
+      <Route path="/invoices/:id" element={<InvoiceView />} />
+
+      {/* NOTE: /pay/success must come before /pay/:id so the static
+          segment is matched first and not swallowed by the dynamic one */}
       <Route path="/pay/success" element={<PaymentSuccess />} />
-      
+      <Route path="/pay/:id" element={<PublicCheckout />} />
+
       <Route path="/public/intake/:token" element={<PublicIntake />} />
       <Route path="/public/updates/:token" element={<PublicTimeline />} />
-      
+
       {/* 🟡 SEMI-PROTECTED (No Sidebar/Layout) */}
-      <Route 
-        path="/setup-workspace" 
+      <Route
+        path="/setup-workspace"
         element={
           <ProtectedRoute>
             <CreateWorkspace />
           </ProtectedRoute>
-        } 
+        }
       />
-      
+
       {/* 🔴 FULLY PROTECTED (The Main App) */}
-      <Route path="/" element={
-        <ProtectedRoute>
-          <div className="flex flex-col h-screen w-full overflow-hidden">
-            <TrialBanner /> 
-            <div className="flex-1 overflow-hidden">
-              <Layout />
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <div className="flex flex-col h-screen w-full overflow-hidden">
+              <TrialBanner />
+              <div className="flex-1 overflow-hidden">
+                <Layout />
+              </div>
             </div>
-          </div>
-        </ProtectedRoute>
-      }>
+          </ProtectedRoute>
+        }
+      >
         <Route index element={<Dashboard />} />
         <Route path="clients" element={<Clients />} />
         <Route path="projects" element={<Projects />} />
@@ -149,7 +161,14 @@ export default function App() {
       </Route>
 
       {/* Global 404 */}
-      <Route path="*" element={<div className="flex items-center justify-center min-h-screen font-black text-navy text-4xl">404: OUT OF BOUNDS</div>} />
+      <Route
+        path="*"
+        element={
+          <div className="flex items-center justify-center min-h-screen font-black text-navy text-4xl">
+            404: OUT OF BOUNDS
+          </div>
+        }
+      />
     </Routes>
   );
 }
