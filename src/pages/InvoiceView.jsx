@@ -15,8 +15,11 @@ export default function InvoiceView() {
   useEffect(() => {
     const fetchInvoice = async () => {
       try {
-        const res = await api.get(`/invoices/${id}`);
-        setInvoice(res.data?.data || res.data);
+        // 🔒 THE FIX: Route through the public gateway
+        const res = await api.get(`/public/invoices/${id}`); 
+        
+        // The public gateway returns { invoice, org }, so we extract the invoice here
+        setInvoice(res.data?.invoice || res.data); 
       } catch (err) {
         console.error(err);
         setError('Failed to load invoice details.');

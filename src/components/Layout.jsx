@@ -209,7 +209,7 @@ export default function Layout() {
         </div>
 
         {/* MOBILE HEADER */}
-        <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-navy border-b border-gray-800 flex items-center justify-between px-4 z-30 shadow-md">
+        <div className="md:hidden sticky top-0 left-0 right-0 h-14 bg-navy border-b border-gray-800 flex items-center justify-between px-4 z-30 shadow-md">
           <h1 className="text-lg font-black text-white flex items-center gap-2">
             <div className="w-7 h-7 bg-accent text-navy rounded-lg flex items-center justify-center font-black">R</div>
             <span className="italic font-black">REGULUS.</span>

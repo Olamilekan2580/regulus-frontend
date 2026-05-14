@@ -1,12 +1,3 @@
-/**
- * @fileoverview Global Trial Notification Banner
- * @architecture Memory-Safe, State-Aware, Graceful Fallbacks
- * * CRITICAL FIXES APPLIED:
- * - Solves Issue #17: Implemented `isNaN` guards. If `trial_ends_at` is null, the app no longer crashes.
- * - State-Aware Hiding: Banner automatically unmounts if `subscription_status` is 'active'.
- * - Routing: Wired the Upgrade button to push the user directly to the Settings billing module.
- */
-
 import { useState, useEffect } from 'react';
 import { Clock, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -18,7 +9,7 @@ export default function TrialBanner() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    let isMounted = true; // 🔒 Memory leak protection
+    let isMounted = true; 
 
     const fetchStatus = async () => {
       const orgId = localStorage.getItem('current_org_id');
@@ -32,7 +23,6 @@ export default function TrialBanner() {
         
         setStatus(subscription_status || 'trialing');
 
-        // 🛡️ CRITICAL FIX: Safe Date Parsing
         if (trial_ends_at) {
           const end = new Date(trial_ends_at);
           
@@ -40,7 +30,7 @@ export default function TrialBanner() {
             const diff = Math.ceil((end - new Date()) / (1000 * 60 * 60 * 24));
             setDaysLeft(diff > 0 ? diff : 0);
           } else {
-            setDaysLeft(0); // Graceful fallback if timestamp is corrupted
+            setDaysLeft(0); 
           }
         } else {
           setDaysLeft(0);
@@ -57,27 +47,33 @@ export default function TrialBanner() {
     };
   }, []);
 
-  // 1. Hide if we are still fetching data to prevent layout shift
-  // 2. Hide if the user has already paid (Active Enterprise/Agency tier)
   if (status === 'loading' || status === 'active') return null;
 
   const isExpired = daysLeft === 0;
 
   return (
-    <div className="bg-navy text-white py-2 px-6 flex items-center justify-between border-b border-white/10 shrink-0 z-50">
-      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
-        <Clock size={14} className={isExpired ? "text-red-500" : "text-accent"} />
-        <span className={isExpired ? "text-red-400" : ""}>
-          {isExpired 
-            ? 'Your workspace trial has expired' 
-            : `${daysLeft} days left in your free trial`}
+    <div className="relative w-full bg-navy text-white py-2.5 px-4 md:px-6 flex items-center justify-between border-b border-white/10 shrink-0 z-[60]">
+      <div className="flex items-center gap-2 text-[10px] md:text-xs font-bold uppercase tracking-widest truncate pr-2">
+        <Clock size={14} className={`shrink-0 ${isExpired ? "text-red-500" : "text-accent"}`} />
+        <span className={`truncate ${isExpired ? "text-red-400" : ""}`}>
+          {isExpired ? (
+            <>
+              <span className="md:hidden">Trial Expired</span>
+              <span className="hidden md:inline">Your workspace trial has expired</span>
+            </>
+          ) : (
+            <>
+              <span className="md:hidden">{daysLeft} days left</span>
+              <span className="hidden md:inline">{daysLeft} days left in your free trial</span>
+            </>
+          )}
         </span>
       </div>
       <button 
         onClick={() => navigate('/settings')}
-        className="bg-accent text-navy text-[10px] font-black px-4 py-1.5 rounded-full uppercase hover:scale-105 transition-transform flex items-center gap-1 shadow-[0_0_15px_rgba(0,200,150,0.2)] active:scale-95"
+        className="bg-accent text-navy text-[10px] font-black px-4 py-1.5 rounded-full uppercase hover:scale-105 transition-transform flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,200,150,0.2)] active:scale-95 shrink-0"
       >
-        <Zap size={10} /> Upgrade Now
+        <Zap size={10} className="hidden sm:block" /> Upgrade <span className="hidden sm:inline">Now</span>
       </button>
     </div>
   );
