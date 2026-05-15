@@ -49,17 +49,19 @@ export default function Clients() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+      {/* Header - Fixed for Mobile */}
+      <div className="flex flex-row items-start justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-navy tracking-tight">Clients</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-navy tracking-tight">Clients</h1>
           <p className="text-sm text-gray-500 mt-1 font-medium">Manage your client relationships</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-navy text-white px-5 py-2.5 rounded-lg hover:bg-navy/90 transition-all font-medium shadow-sm active:scale-95"
+          className="bg-navy text-white px-4 py-2.5 md:px-6 md:py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-navy/90 transition-colors shadow-sm shadow-navy/10 shrink-0 text-sm md:text-base mt-1 active:scale-95"
         >
-          <Plus size={18} strokeWidth={2.5} /> Add Client
+          <Plus size={18} strokeWidth={2.5} className="md:w-5 md:h-5" /> 
+          <span className="hidden sm:inline">Add Client</span>
+          <span className="sm:hidden">Add</span>
         </button>
       </div>
 
@@ -103,11 +105,11 @@ export default function Clients() {
                   <div className="w-12 h-12 rounded-full bg-navy/5 text-navy font-bold flex items-center justify-center text-sm border border-navy/10 shrink-0">
                     {getInitials(client.name)}
                   </div>
-                  <div>
-                    <h3 className="font-bold text-lg text-navy leading-tight">{client.name}</h3>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-bold text-lg text-navy leading-tight truncate">{client.name}</h3>
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider mt-1">
-                      <Building size={12} />
-                      {client.company || 'Independent'}
+                      <Building size={12} className="shrink-0" />
+                      <span className="truncate">{client.company || 'Independent'}</span>
                     </div>
                   </div>
                 </div>
@@ -124,7 +126,7 @@ export default function Clients() {
                       <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
                         <Phone size={14} className="text-gray-400" />
                       </div>
-                      <span>{client.phone}</span>
+                      <span className="truncate">{client.phone}</span>
                     </div>
                   )}
                 </div>
@@ -137,11 +139,11 @@ export default function Clients() {
       {/* Premium Add Client Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-navy/40 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-2xl p-6 md:p-8 w-full max-w-md shadow-2xl scale-100 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold text-navy mb-1">New Client</h2>
             <p className="text-sm text-gray-500 mb-6">Enter the details for your new point of contact.</p>
             
-            {error && <div className="mb-6 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-red-600"></div>{error}</div>}
+            {error && <div className="mb-6 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-red-600 shrink-0"></div>{error}</div>}
             
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
@@ -163,16 +165,23 @@ export default function Clients() {
               
               <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-50">
                 <button 
-  type="submit" 
-  disabled={isSubmitting}
-  className="px-5 py-2.5 font-medium text-sm bg-navy text-white rounded-xl hover:bg-navy/90 transition-all shadow-sm active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center min-w-[140px]"
->
-  {isSubmitting ? (
-    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/20 border-t-white"></div>
-  ) : (
-    "Save Client"
-  )}
-</button>
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-5 py-2.5 font-medium text-sm text-gray-500 hover:bg-gray-50 rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="px-5 py-2.5 font-medium text-sm bg-navy text-white rounded-xl hover:bg-navy/90 transition-all shadow-sm active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center min-w-[140px]"
+                >
+                  {isSubmitting ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/20 border-t-white"></div>
+                  ) : (
+                    "Save Client"
+                  )}
+                </button>
               </div>
             </form>
           </div>

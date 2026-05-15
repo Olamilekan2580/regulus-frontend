@@ -46,8 +46,9 @@ export default function ContractSandbox() {
   };
 
   return (
-    <div className="space-y-6 h-[calc(100vh-8rem)] flex flex-col">
-      <div className="flex justify-between items-center shrink-0">
+    <div className="space-y-6 flex flex-col min-h-full">
+      {/* 1. RESPONSIVE HEADER */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
         <div>
           <h1 className="text-2xl font-bold text-navy flex items-center gap-2">
             <Scale className="text-accent" /> AI Contract Sandbox
@@ -57,7 +58,7 @@ export default function ContractSandbox() {
         <button 
           onClick={handleAnalyze}
           disabled={isAnalyzing || !contractText.trim()}
-          className="flex items-center gap-2 bg-navy text-white px-6 py-2.5 rounded-xl font-bold shadow-sm hover:bg-navy/90 disabled:opacity-50 transition-all active:scale-95"
+          className="w-full md:w-auto flex justify-center items-center gap-2 bg-navy text-white px-6 py-3 md:py-2.5 rounded-xl font-bold shadow-sm hover:bg-navy/90 disabled:opacity-50 transition-all active:scale-95"
         >
           {isAnalyzing ? (
             <><div className="w-4 h-4 border-2 border-white/30 border-t-white animate-spin rounded-full" /> Auditing Clauses...</>
@@ -73,10 +74,12 @@ export default function ContractSandbox() {
         </div>
       )}
 
-      <div className="flex gap-6 flex-1 min-h-0">
+      {/* 2. RESPONSIVE GRID (Stacks on mobile, side-by-side on desktop) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1">
+        
         {/* LEFT PANE: Raw Input */}
-        <div className="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden focus-within:border-accent/50 transition-colors">
-          <div className="bg-gray-50 px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+        <div className="flex flex-col bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden focus-within:border-accent/50 transition-colors min-h-[400px] lg:min-h-[600px]">
+          <div className="bg-gray-50 px-6 py-4 border-b border-gray-100 flex items-center gap-2 shrink-0">
             <FileText size={18} className="text-gray-400" />
             <h2 className="font-black text-navy text-[10px] uppercase tracking-[0.2em]">Client MSA / Agreement</h2>
           </div>
@@ -89,15 +92,15 @@ export default function ContractSandbox() {
         </div>
 
         {/* RIGHT PANE: AI Audit Results */}
-        <div className="flex-1 flex flex-col bg-gray-50 rounded-2xl shadow-inner border border-gray-200 overflow-hidden">
-          <div className="bg-navy px-6 py-4 flex items-center justify-between">
+        <div className="flex flex-col bg-gray-50 rounded-2xl shadow-inner border border-gray-200 overflow-hidden min-h-[500px] lg:min-h-[600px] max-h-[800px] lg:max-h-none">
+          <div className="bg-navy px-6 py-4 flex items-center justify-between shrink-0">
             <h2 className="font-bold text-white text-xs uppercase tracking-widest flex items-center gap-2">
               <ShieldAlert size={18} className="text-accent" /> Risk Analysis
             </h2>
-            <span className="text-[10px] font-black text-white/40 bg-white/5 px-2 py-1 rounded-md border border-white/10 uppercase tracking-tighter">Powered by Groq</span>
+            <span className="text-[10px] font-black text-white/40 bg-white/5 px-2 py-1 rounded-md border border-white/10 uppercase tracking-tighter shrink-0">Powered by Groq</span>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
             {!isAnalyzing && flags.length === 0 && !error && (
               <div className="h-full flex flex-col items-center justify-center text-gray-400 text-center p-8">
                 <Scale size={48} className="mb-4 opacity-10" />
@@ -128,10 +131,10 @@ export default function ContractSandbox() {
                   <AlertTriangle size={14} /> {flag.risk} Risk Liability
                 </div>
                 
-                <div className="p-5 space-y-4">
+                <div className="p-4 md:p-5 space-y-4">
                   <div>
                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Problematic Clause</span>
-                    <p className="text-xs text-gray-600 bg-gray-50 p-4 rounded-xl border border-gray-100 italic leading-relaxed">
+                    <p className="text-xs text-gray-600 bg-gray-50 p-3 md:p-4 rounded-xl border border-gray-100 italic leading-relaxed break-words">
                       "{flag.clause}"
                     </p>
                   </div>
@@ -144,17 +147,17 @@ export default function ContractSandbox() {
                   </div>
 
                   <div className="pt-5 border-t border-gray-100">
-                    <div className="flex justify-between items-center mb-3">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 mb-3">
                       <span className="text-[10px] font-black text-accent uppercase tracking-widest">Suggested Counter-Proposal</span>
                       <button 
                         onClick={() => copyCounterProposal(flag.counter_proposal, index)}
-                        className="text-[10px] font-black text-navy hover:text-accent flex items-center gap-1.5 transition-colors uppercase tracking-widest"
+                        className="text-[10px] font-black text-navy hover:text-accent flex items-center gap-1.5 transition-colors uppercase tracking-widest bg-gray-50 sm:bg-transparent px-3 py-1.5 sm:p-0 rounded-md sm:rounded-none"
                       >
-                        {copiedIndex === index ? <CheckCircle2 size={12} className="text-green-500" /> : <Copy size={12} />}
+                        {copiedIndex === index ? <CheckCircle2 size={12} className="text-green-500 shrink-0" /> : <Copy size={12} className="shrink-0" />}
                         {copiedIndex === index ? 'Copied' : 'Copy Override'}
                       </button>
                     </div>
-                    <p className="text-sm text-gray-800 bg-accent/5 p-4 rounded-xl border border-accent/10 font-medium leading-relaxed">
+                    <p className="text-sm text-gray-800 bg-accent/5 p-3 md:p-4 rounded-xl border border-accent/10 font-medium leading-relaxed break-words">
                       {flag.counter_proposal}
                     </p>
                   </div>

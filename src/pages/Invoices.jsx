@@ -95,17 +95,13 @@ export default function Invoices() {
     };
   };
 
-  // Inside src/pages/Invoices.jsx
+  const handleCopyLink = (id) => {
+    const publicUrl = `${window.location.origin}/pay/${id}`; 
+    navigator.clipboard.writeText(publicUrl);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
-const handleCopyLink = (id) => {
-  // THE FIX: Point to /pay/ instead of /invoices/
-  const publicUrl = `${window.location.origin}/pay/${id}`; 
-  navigator.clipboard.writeText(publicUrl);
-  setCopiedId(id);
-  setTimeout(() => setCopiedId(null), 2000);
-};
-
-  // 🔒 THE FIX: Replaces updateStatus and talks directly to the DB
   const handleStatusChange = async (id, newStatus) => {
     try {
       await api.put(`/invoices/${id}`, { status: newStatus });
@@ -196,16 +192,19 @@ const handleCopyLink = (id) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      {/* 🔒 FIX: Mobile-Responsive Header */}
+      <div className="flex flex-row items-start justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-navy">Invoices</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-navy tracking-tight">Invoices</h1>
           <p className="text-sm text-gray-500 mt-1 font-medium">Global billing and dynamic line items</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)} 
-          className="flex items-center gap-2 bg-navy text-white px-4 py-2 rounded-lg font-medium shadow-sm hover:bg-navy/90 transition-all active:scale-95"
+          className="bg-navy text-white px-4 py-2.5 md:px-6 md:py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-navy/90 transition-colors shadow-sm shadow-navy/10 shrink-0 text-sm md:text-base mt-1 active:scale-95"
         >
-          <Plus size={20} /> Create Invoice
+          <Plus size={18} strokeWidth={2.5} className="md:w-5 md:h-5" /> 
+          <span className="hidden sm:inline">Create Invoice</span>
+          <span className="sm:hidden">Create</span>
         </button>
       </div>
 
@@ -299,7 +298,8 @@ const handleCopyLink = (id) => {
       )}
       
       {isModalOpen && (
-        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 overflow-y-auto animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
+          {/* 🔒 FIX: Modal container height constraint and flex-col */}
           <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 relative overflow-hidden">
             
             <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 shrink-0">

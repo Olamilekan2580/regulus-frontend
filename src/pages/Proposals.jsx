@@ -135,16 +135,19 @@ export default function Proposals() {
 
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center">
+      {/* 🔒 FIX: Mobile-Responsive Header */}
+      <div className="flex flex-row items-start justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-navy tracking-tight">Proposals</h1>
-          <p className="text-sm text-gray-500 mt-1 font-medium">Draft and send scopes of work to win new business.</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-navy tracking-tight">Proposals</h1>
+          <p className="text-sm text-gray-500 mt-1 font-medium">Draft and send scopes of work.</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-navy text-white px-5 py-2.5 rounded-lg hover:bg-navy/90 transition-all font-medium shadow-sm active:scale-95"
+          className="bg-navy text-white px-4 py-2.5 md:px-6 md:py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-navy/90 transition-colors shadow-sm shadow-navy/10 shrink-0 text-sm md:text-base mt-1 active:scale-95"
         >
-          <Plus size={18} strokeWidth={2.5} /> New Proposal
+          <Plus size={18} strokeWidth={2.5} className="md:w-5 md:h-5" /> 
+          <span className="hidden sm:inline">New Proposal</span>
+          <span className="sm:hidden">New</span>
         </button>
       </div>
 
@@ -235,10 +238,8 @@ export default function Proposals() {
       {isModalOpen && (
         <div className="fixed inset-0 z-[9999] bg-navy/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
           
-          {/* 🔒 THE FIX: flex-col, max-h-[90vh], and overflow-hidden to constrain the modal height */}
           <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 relative overflow-hidden">
             
-            {/* 1. FIXED HEADER (shrink-0 ensures it never squishes) */}
             <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 shrink-0">
               <div>
                 <h2 className="text-xl font-bold text-navy">Draft Proposal</h2>
@@ -249,7 +250,6 @@ export default function Proposals() {
               </button>
             </div>
             
-            {/* 2. SCROLLABLE BODY (overflow-y-auto ensures the internal fields scroll) */}
             <div className="p-6 overflow-y-auto flex-1">
               {error && (
                 <div className="mb-6 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100 flex items-center gap-2">

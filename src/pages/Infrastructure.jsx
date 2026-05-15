@@ -97,7 +97,7 @@ export default function Infrastructure() {
   };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-6xl mx-auto pb-8">
       <div>
         <h1 className="text-2xl font-bold text-navy flex items-center gap-2">
           <Terminal className="text-accent" /> Infrastructure Provisioning
@@ -183,8 +183,9 @@ export default function Infrastructure() {
           </form>
         </div>
 
-        <div className="lg:col-span-3 bg-[#0D1117] rounded-2xl shadow-2xl border border-gray-800 flex flex-col overflow-hidden h-[620px]">
-          <div className="bg-[#161B22] px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+        {/* 🔒 FIX: Added height constraints and flex-col for correct mobile scrolling */}
+        <div className="lg:col-span-3 bg-[#0D1117] rounded-2xl shadow-2xl border border-gray-800 flex flex-col h-[500px] md:h-[620px] overflow-hidden mb-8 lg:mb-0">
+          <div className="bg-[#161B22] px-6 py-4 border-b border-gray-800 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
               <div className="flex gap-1.5">
                 <div className="w-3 h-3 rounded-full bg-[#FF5F56]"></div>
@@ -197,7 +198,7 @@ export default function Infrastructure() {
             {isProvisioning && <span className="text-[10px] font-black text-accent animate-pulse uppercase tracking-tighter">Live Stream</span>}
           </div>
           
-          <div className="flex-1 p-8 font-mono text-xs overflow-y-auto space-y-3 leading-relaxed">
+          <div className="flex-1 p-6 md:p-8 font-mono text-xs overflow-y-auto space-y-3 leading-relaxed">
             {logs.length === 0 && status === 'idle' && (
               <div className="text-gray-700 h-full flex flex-col items-center justify-center italic gap-4">
                 <Terminal size={40} className="opacity-10" />
@@ -230,7 +231,7 @@ export default function Infrastructure() {
           </div>
 
           {status === 'complete' && (
-            <div className="bg-[#27C93F]/5 border-t border-[#27C93F]/20 p-5 flex items-center justify-between">
+            <div className="bg-[#27C93F]/5 border-t border-[#27C93F]/20 p-5 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2 text-[#27C93F] font-bold text-xs uppercase tracking-wider">
                 <CheckCircle2 size={16} /> Environments Verified
               </div>
@@ -244,7 +245,7 @@ export default function Infrastructure() {
           )}
           
           {status === 'error' && (
-            <div className="bg-[#FF5F56]/5 border-t border-[#FF5F56]/20 p-5 flex items-center gap-3 text-[#FF5F56] font-bold text-xs uppercase tracking-widest">
+            <div className="bg-[#FF5F56]/5 border-t border-[#FF5F56]/20 p-5 flex items-center gap-3 text-[#FF5F56] font-bold text-xs uppercase tracking-widest shrink-0">
               <AlertCircle size={16} /> Pipeline Terminated
             </div>
           )}

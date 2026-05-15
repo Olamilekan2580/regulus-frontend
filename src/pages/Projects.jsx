@@ -55,7 +55,7 @@ export default function Projects() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setIsSubmitting(true); // 🔒 LOCK THE BUTTON
+    setIsSubmitting(true); 
 
     try {
       await api.post('/projects', formData);
@@ -71,7 +71,7 @@ export default function Projects() {
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create project');
     } finally {
-      setIsSubmitting(false); // 🔓 UNLOCK THE BUTTON
+      setIsSubmitting(false); 
     }
   };
 
@@ -83,17 +83,19 @@ export default function Projects() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+      {/* 🔒 FIX: Mobile-Responsive Header */}
+      <div className="flex flex-row items-start justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-navy tracking-tight">Projects</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-navy tracking-tight">Projects</h1>
           <p className="text-sm text-gray-500 mt-1 font-medium">Track and manage active deliverables</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-navy text-white px-5 py-2.5 rounded-lg hover:bg-navy/90 transition-all font-medium shadow-sm active:scale-95"
+          className="bg-navy text-white px-4 py-2.5 md:px-6 md:py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-navy/90 transition-colors shadow-sm shadow-navy/10 shrink-0 text-sm md:text-base mt-1 active:scale-95"
         >
-          <Plus size={18} strokeWidth={2.5} /> New Project
+          <Plus size={18} strokeWidth={2.5} className="md:w-5 md:h-5" /> 
+          <span className="hidden sm:inline">New Project</span>
+          <span className="sm:hidden">New</span>
         </button>
       </div>
 
@@ -125,7 +127,6 @@ export default function Projects() {
             projects.map(project => (
               <div key={project.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group relative flex flex-col h-full">
                 
-                {/* Settings menu trigger */}
                 <button className="absolute top-4 right-4 text-gray-300 hover:text-navy opacity-0 group-hover:opacity-100 transition-opacity">
                   <MoreVertical size={18} />
                 </button>
@@ -147,7 +148,6 @@ export default function Projects() {
                   {project.description || 'No description provided.'}
                 </p>
 
-                {/* Footer with Share & Update Buttons */}
                 <div className="flex items-center justify-between border-t border-gray-50 pt-4 mt-auto">
                   <div className="flex items-center gap-2 text-sm text-gray-500 group-hover:text-navy transition-colors">
                     <div className="w-7 h-7 rounded-md bg-gray-50 flex items-center justify-center shrink-0">
@@ -159,7 +159,6 @@ export default function Projects() {
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    {/* Post Update Button (Now opens Unified Hub) */}
                     <button 
                       onClick={() => setUpdateProject(project)}
                       className="flex items-center gap-1.5 text-xs font-bold text-navy bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
@@ -167,7 +166,6 @@ export default function Projects() {
                       <Send size={14} /> Manage
                     </button>
 
-                    {/* Existing Share Button */}
                     <button 
                       onClick={() => setShareProject(project)}
                       className="flex items-center gap-1.5 text-xs font-bold text-[#00C896] bg-[#00C896]/10 hover:bg-[#00C896]/20 px-3 py-1.5 rounded-lg transition-colors"
@@ -182,17 +180,17 @@ export default function Projects() {
         </div>
       )}
 
-      {/* Share Links Modal */}
+      {/* Share Links Modal (Responsive Constraints Added) */}
       {shareProject && (
-        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-[#0A0F1E] rounded-2xl w-full max-w-xl shadow-2xl scale-100 animate-in zoom-in-95 duration-200 overflow-hidden border border-slate-800">
-            <div className="flex justify-between items-center p-6 border-b border-slate-800 bg-slate-900/50">
-              <h2 className="text-xl font-bold text-white">Share Project: {shareProject.name}</h2>
-              <button onClick={() => setShareProject(null)} className="text-slate-400 hover:text-white transition-colors">
+        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
+          <div className="bg-[#0A0F1E] rounded-2xl w-full max-w-xl shadow-2xl flex flex-col max-h-[90vh] scale-100 animate-in zoom-in-95 duration-200 overflow-hidden border border-slate-800 relative">
+            <div className="flex justify-between items-center p-6 border-b border-slate-800 bg-slate-900/50 shrink-0">
+              <h2 className="text-xl font-bold text-white truncate pr-4">Share: {shareProject.name}</h2>
+              <button onClick={() => setShareProject(null)} className="text-slate-400 hover:text-white transition-colors shrink-0">
                 <X size={20} />
               </button>
             </div>
-            <div className="p-6">
+            <div className="p-6 overflow-y-auto flex-1">
               <ProjectShareLinks project={shareProject} />
               <button 
                 onClick={() => setShareProject(null)}
@@ -205,115 +203,120 @@ export default function Projects() {
         </div>
       )}
 
-      {/* Unified Project Hub Modal (Upgraded) */}
+      {/* Unified Project Hub Modal */}
       {updateProject && (
-        <div className="fixed inset-0 bg-navy/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-navy/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
           <div className="bg-gray-50 rounded-3xl w-full max-w-6xl shadow-2xl scale-100 animate-in zoom-in-95 duration-200 overflow-hidden relative max-h-[90vh] flex flex-col">
             
-            {/* Hub Header */}
             <div className="flex justify-between items-center p-6 bg-white border-b border-gray-100 shrink-0">
-              <div>
-                <h2 className="text-xl font-bold text-navy flex items-center gap-2">
-                  <FolderKanban size={24} className="text-accent" /> 
-                  Project Hub: {updateProject.name}
+              <div className="min-w-0 flex-1">
+                <h2 className="text-xl font-bold text-navy flex items-center gap-2 truncate">
+                  <FolderKanban size={24} className="text-accent shrink-0" /> 
+                  <span className="truncate">Hub: {updateProject.name}</span>
                 </h2>
-                <p className="text-sm text-gray-500 mt-1">Manage outbound updates and view incoming client submissions.</p>
+                <p className="text-sm text-gray-500 mt-1 truncate">Manage outbound updates and view incoming submissions.</p>
               </div>
               <button 
                 onClick={() => setUpdateProject(null)} 
-                className="text-gray-400 hover:text-navy transition-colors bg-gray-50 p-2.5 rounded-full hover:bg-gray-100"
+                className="text-gray-400 hover:text-navy transition-colors bg-gray-50 p-2.5 rounded-full hover:bg-gray-100 shrink-0 ml-4"
               >
                 <X size={20} />
               </button>
             </div>
             
-            {/* Hub Body (Scrollable 2-Column Grid) */}
-            <div className="p-6 overflow-y-auto">
+            <div className="p-6 overflow-y-auto flex-1">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                
-                {/* Left Column: Freelancer Output */}
                 <div>
                   <ProjectUpdateUploader 
                     projectId={updateProject.id} 
                     onUpdatePosted={() => fetchData()} 
                   />
                 </div>
-
-                {/* Right Column: Client Intake */}
                 <div>
                   <ClientSubmissionsFeed projectId={updateProject.id} />
                 </div>
-
               </div>
             </div>
-
           </div>
         </div>
       )}
 
-      {/* Premium Create Modal */}
+      {/* 🔒 FIX: Premium Create Modal Constraints */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-navy/40 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl p-8 w-full max-w-lg shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
-            <h2 className="text-2xl font-bold text-navy mb-1">Create Project</h2>
-            <p className="text-sm text-gray-500 mb-6">Set up a new workspace for your client deliverables.</p>
+        <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 relative overflow-hidden">
             
-            {error && <div className="mb-6 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-red-600"></div>{error}</div>}
-            
-            {clients.length === 0 ? (
-              <div className="text-center p-8 bg-gray-50 rounded-xl border border-gray-100">
-                <p className="text-gray-600 mb-4 font-medium">You need to add a Client before creating a Project.</p>
-                <button onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 bg-navy text-white font-medium rounded-xl hover:bg-navy/90 transition-all">Close</button>
+            <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 shrink-0">
+              <div>
+                <h2 className="text-2xl font-bold text-navy">Create Project</h2>
+                <p className="text-sm text-gray-500 font-medium">Set up a new workspace for deliverables.</p>
               </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Client *</label>
-                  <select required className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium appearance-none" value={formData.client_id} onChange={e => setFormData({...formData, client_id: e.target.value})}>
-                    {clients.map(c => <option key={c.id} value={c.id}>{c.company || c.name}</option>)}
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Project Name *</label>
-                  <input type="text" required className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="e.g. E-Commerce Redesign" />
-                </div>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-navy transition-colors bg-white rounded-full p-1 border border-gray-200 shadow-sm">
+                <X size={20} />
+              </button>
+            </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Description</label>
-                  <textarea className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium resize-none h-24" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="High-level overview of the deliverables..."></textarea>
+            <div className="p-6 overflow-y-auto flex-1">
+              {error && <div className="mb-6 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-red-600 shrink-0"></div>{error}</div>}
+              
+              {clients.length === 0 ? (
+                <div className="text-center p-8 bg-gray-50 rounded-xl border border-gray-100">
+                  <p className="text-gray-600 mb-4 font-medium">You need to add a Client before creating a Project.</p>
+                  <button onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 bg-navy text-white font-medium rounded-xl hover:bg-navy/90 transition-all">Close</button>
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-5">
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Status</label>
-                    <select className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium appearance-none" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
-                      <option value="Planning">Planning</option>
-                      <option value="Active">Active</option>
-                      <option value="Completed">Completed</option>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Client *</label>
+                    <select required className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium appearance-none" value={formData.client_id} onChange={e => setFormData({...formData, client_id: e.target.value})}>
+                      {clients.map(c => <option key={c.id} value={c.id}>{c.company || c.name}</option>)}
                     </select>
                   </div>
+                  
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Deadline</label>
-                    <input type="date" className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium text-gray-700" value={formData.deadline} onChange={e => setFormData({...formData, deadline: e.target.value})} />
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Project Name *</label>
+                    <input type="text" required className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="e.g. E-Commerce Redesign" />
                   </div>
-                </div>
-                
-                <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-50">
-                  <button 
-  type="submit" 
-  disabled={isSubmitting}
-  className="px-5 py-2.5 font-medium text-sm bg-navy text-white rounded-xl hover:bg-navy/90 transition-all shadow-sm active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center min-w-[140px]"
->
-  {isSubmitting ? (
-    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/20 border-t-white"></div>
-  ) : (
-    "Create Project"
-  )}
-</button>
-                </div>
-              </form>
-            )}
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Description</label>
+                    <textarea className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium resize-none h-24" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="High-level overview of the deliverables..."></textarea>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Status</label>
+                      <select className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium appearance-none" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
+                        <option value="Planning">Planning</option>
+                        <option value="Active">Active</option>
+                        <option value="Completed">Completed</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Deadline</label>
+                      <input type="date" className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:bg-white focus:ring-2 focus:ring-navy/20 focus:border-navy outline-none transition-all text-sm font-medium text-gray-700" value={formData.deadline} onChange={e => setFormData({...formData, deadline: e.target.value})} />
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-50">
+                    <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 font-medium text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit" 
+                      disabled={isSubmitting}
+                      className="px-5 py-2.5 font-medium text-sm bg-navy text-white rounded-xl hover:bg-navy/90 transition-all shadow-sm active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center min-w-[140px]"
+                    >
+                      {isSubmitting ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/20 border-t-white"></div>
+                      ) : (
+                        "Create Project"
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           </div>
         </div>
       )}
