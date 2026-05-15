@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import api from './lib/api';
+import { supabase } from './lib/supabase';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
@@ -28,16 +29,62 @@ import ProposalView from './pages/ProposalView';
 import InvoiceView from './pages/InvoiceView';
 import PublicCheckout from './pages/PublicCheckout';
 import PaymentSuccess from './pages/PaymentSuccess';
+import Policies from './pages/Policies';
+import Terms from './pages/Terms';
 
 export default function App() {
   const [isRouting, setIsRouting] = useState(true);
   const [tenantError, setTenantError] = useState(false);
+  const navigate = useNavigate();
 
+  // ==========================================
+  // 1. GLOBAL OAUTH LISTENER (THE FIX)
+  // ==========================================
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      
+      if (event === 'SIGNED_IN' && session) {
+        const existingOrgId = localStorage.getItem('current_org_id');
+        
+        // If OAuth bypasses the manual login function, catch them here
+        if (!existingOrgId) {
+          try {
+            // Fetch the user's profile which contains their org_id
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('org_id')
+              .eq('id', session.user.id)
+              .single();
+
+            if (profile?.org_id) {
+              localStorage.setItem('current_org_id', profile.org_id);
+              // Force reload to mount the application with the new Tenant Context
+              window.location.reload(); 
+            } else {
+              // If they are a brand new Google/GitHub user with no org yet, route them to setup
+              navigate('/setup-workspace');
+            }
+          } catch (error) {
+            console.error('[OAuth Context Error]: Could not retrieve org_id', error);
+          }
+        }
+      }
+      
+      if (event === 'SIGNED_OUT') {
+        localStorage.removeItem('current_org_id');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  // ==========================================
+  // 2. EDGE ROUTING & WHITE-LABEL (EXISTING)
+  // ==========================================
   useEffect(() => {
     const routeEdgeRequest = async () => {
       const hostname = window.location.hostname;
 
-      // 1. Bypass interceptor for localhost or your base Vercel domain
       if (
         hostname === 'localhost' ||
         hostname === '127.0.0.1' ||
@@ -47,12 +94,10 @@ export default function App() {
         return;
       }
 
-      // 2. We are on a custom domain. Execute the lookup.
       try {
         const res = await api.get(`/public/domain-lookup?domain=${hostname}`);
         const org = res.data;
 
-        // 3. Inject the white-label environment
         if (org && org.brand_settings) {
           const brand =
             typeof org.brand_settings === 'string'
@@ -63,7 +108,6 @@ export default function App() {
           if (brand.primary) root.style.setProperty('--theme-navy', brand.primary);
           if (brand.accent) root.style.setProperty('--theme-accent', brand.accent);
 
-          // Save the tenant ID so the login screen knows which agency this user belongs to
           localStorage.setItem('tenant_org_id', org.id);
           localStorage.setItem('tenant_org_name', org.name);
         }
@@ -79,7 +123,6 @@ export default function App() {
     routeEdgeRequest();
   }, []);
 
-  // Show a loading state during the split-second DNS lookup
   if (isRouting) {
     return (
       <div className="min-h-screen bg-[#0A0F1E] flex items-center justify-center">
@@ -88,7 +131,6 @@ export default function App() {
     );
   }
 
-  // If someone points a random domain to your server that isn't in your database
   if (tenantError) {
     return (
       <div className="min-h-screen bg-[#0A0F1E] flex items-center justify-center p-4">
@@ -112,6 +154,8 @@ export default function App() {
       <Route path="/secret/:id" element={<SecretReveal />} />
       <Route path="/p/:id" element={<ProposalView />} />
       <Route path="/invoices/:id" element={<InvoiceView />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/policies" element={<Policies />} />
 
       {/* NOTE: /pay/success must come before /pay/:id so the static
           segment is matched first and not swallowed by the dynamic one */}

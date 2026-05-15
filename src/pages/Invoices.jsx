@@ -116,8 +116,9 @@ export default function Invoices() {
     e.preventDefault();
     const orgId = localStorage.getItem('current_org_id');
     
-    if (!orgId) {
-      setError('Workspace context missing. Please refresh.');
+    // HARDENED LOCK: Blocks actual nulls AND stringified nulls/undefined
+    if (!orgId || orgId === 'undefined' || orgId === 'null') {
+      setError('Workspace context missing. Please log out and log back in.');
       return;
     }
 
@@ -127,7 +128,7 @@ export default function Invoices() {
     try {
       const sanitizedPayload = {
         ...formData,
-        org_id: orgId,
+        org_id: orgId, // <-- THE CRITICAL FIX
         project_id: formData.project_id || null, 
         total: calculateTotal(),
         line_items: formData.line_items.map(item => ({

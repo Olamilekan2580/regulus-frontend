@@ -65,10 +65,18 @@ export default function Proposals() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    
+    const orgId = localStorage.getItem('current_org_id');
+    if (!orgId || orgId === 'undefined' || orgId === 'null') {
+      setError('Workspace context missing. Please log out and log back in.');
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
       const payload = new FormData();
+      payload.append('org_id', orgId); // <-- THE CRITICAL FIX
       payload.append('client_id', formData.client_id);
       payload.append('project_id', formData.project_id || '');
       payload.append('title', formData.title);
@@ -108,7 +116,7 @@ export default function Proposals() {
       });
       fetchData();
     } catch (err) {
-      setError(err.response?.data?.error || 'Database execution failed. Check backend logs.');
+      setError(err.response?.data?.error || 'Database RLS execution failed. Check backend logs.');
     } finally {
       setIsSubmitting(false);
     }
