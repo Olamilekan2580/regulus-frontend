@@ -61,8 +61,26 @@ export default function App() {
               // Force reload to mount the application with the new Tenant Context
               window.location.reload(); 
             } else {
-              // If they are a brand new Google/GitHub user with no org yet, route them to setup
-              navigate('/setup-workspace');
+              // ⚠️ THE FIX: If the user doesn't exist, they are a NEW OAuth signup.
+              // We must provision their workspace immediately.
+              console.warn('[OAuth] New user detected. Provisioning workspace...');
+              
+              try {
+                const initRes = await api.post('/auth/init-workspace', {
+                  email: session.user.email,
+                  name: session.user.user_metadata?.full_name || session.user.email.split('@')[0],
+                  auth_id: session.user.id
+                });
+                
+                const newOrgId = initRes.data?.org_id || initRes.data?.id;
+                if (newOrgId) {
+                  localStorage.setItem('current_org_id', newOrgId);
+                  window.location.reload(); // Hard reset to load the new workspace
+                }
+              } catch (initErr) {
+                console.error('[FATAL]: Failed to provision OAuth workspace', initErr);
+                alert('Failed to initialize your workspace. Please contact support.');
+              }
             }
           } catch (error) {
             console.error('[OAuth Context Error]: Could not retrieve org_id', error);
