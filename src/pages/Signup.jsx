@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { Mail, Lock, User, CheckCircle, ArrowRight, Github, Building2 } from 'lucide-react';
+import { Mail, Lock, User, CheckCircle, ArrowRight, Building2 } from 'lucide-react'; // REMOVED Github
 import api from '../lib/api';
 import { supabase } from '../lib/supabase';
 
@@ -21,20 +21,15 @@ export default function Signup() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const navigate = useNavigate();
 
-  // Persist the invite token to session storage so it survives OAuth redirects
   useEffect(() => {
     if (inviteToken) {
       sessionStorage.setItem('pending_invite_token', inviteToken);
     }
   }, [inviteToken]);
 
-  // ==========================================
-  // UNIFIED OAUTH (GOOGLE & GITHUB)
-  // ==========================================
   const handleOAuthSignup = async (provider) => {
     setOauthLoading(true);
     setError('');
-    
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider,
@@ -42,7 +37,6 @@ export default function Signup() {
           redirectTo: `${window.location.origin}/`
         }
       });
-
       if (error) throw error;
     } catch (err) {
       setError(err.message || `Failed to initialize ${provider} signup.`);
@@ -50,9 +44,6 @@ export default function Signup() {
     }
   };
 
-  // ==========================================
-  // CUSTOM EMAIL SIGNUP (EXISTING)
-  // ==========================================
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -60,7 +51,6 @@ export default function Signup() {
     try {
       await api.post('/auth/signup', formData);
       setIsSubmitted(true);
-      // Clean up session storage since we handled it in the custom flow
       sessionStorage.removeItem('pending_invite_token'); 
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create account');
@@ -68,7 +58,6 @@ export default function Signup() {
     }
   };
 
-  // SUCCESS STATE UI
   if (isSubmitted) {
     return (
       <div className="min-h-screen bg-navy flex items-center justify-center p-4">
@@ -89,11 +78,9 @@ export default function Signup() {
     );
   }
 
-  // STANDARD FORM UI
   return (
     <div className="min-h-screen bg-navy flex flex-col items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-10">
-        
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-accent/20 text-accent rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
             <Building2 size={32} />
@@ -112,7 +99,6 @@ export default function Signup() {
           </div>
         )}
 
-        {/* PRIMARY AUTH: OAUTH PROVIDERS */}
         <div className="flex flex-col gap-3">
           <button
             onClick={() => handleOAuthSignup('google')}
@@ -132,6 +118,7 @@ export default function Signup() {
             )}
           </button>
 
+          {/* FIX: Raw GitHub SVG instead of Lucide component */}
           <button
             onClick={() => handleOAuthSignup('github')}
             disabled={oauthLoading || loading}
@@ -139,14 +126,15 @@ export default function Signup() {
           >
             {oauthLoading ? 'Connecting...' : (
               <>
-                <Github size={18} className="mr-3" />
+                <svg className="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" />
+                </svg>
                 Sign up with GitHub
               </>
             )}
           </button>
         </div>
 
-        {/* DIVIDER */}
         <div className="mt-8 mb-6 relative">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-200" />
@@ -158,7 +146,6 @@ export default function Signup() {
           </div>
         </div>
 
-        {/* SECONDARY AUTH: EMAIL */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <div className="relative">
@@ -219,7 +206,6 @@ export default function Signup() {
         </div>
       </div>
       
-      {/* COMPLIANCE FOOTER FOR GOOGLE AUDIT */}
       <div className="mt-8 flex gap-6 text-sm font-medium text-white/50">
         <Link to="/policies" className="hover:text-white transition-colors">Privacy Policy</Link>
         <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
