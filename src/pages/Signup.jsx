@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { Mail, Lock, User, CheckCircle, ArrowRight, Building2 } from 'lucide-react'; // REMOVED Github
-import api from '../lib/api';
+import { Mail, Lock, User, CheckCircle, ArrowRight, Building2 } from 'lucide-react'; 
 import { supabase } from '../lib/supabase';
 
 export default function Signup() {
@@ -11,8 +10,7 @@ export default function Signup() {
   const [formData, setFormData] = useState({ 
     email: '', 
     password: '', 
-    fullName: '',
-    inviteToken: inviteToken || '' 
+    fullName: ''
   });
   
   const [error, setError] = useState('');
@@ -23,7 +21,8 @@ export default function Signup() {
 
   useEffect(() => {
     if (inviteToken) {
-      sessionStorage.setItem('pending_invite_token', inviteToken);
+      // ARCHITECT FIX: Use localStorage to match App.jsx fail-safes
+      localStorage.setItem('pending_invite_token', inviteToken);
     }
   }, [inviteToken]);
 
@@ -48,41 +47,54 @@ export default function Signup() {
     e.preventDefault();
     setError('');
     setLoading(true);
+    
     try {
-      await api.post('/auth/signup', formData);
-      setIsSubmitted(true);
-      sessionStorage.removeItem('pending_invite_token'); 
+      // ARCHITECT FIX: Native Supabase signup. 
+      // Because email confirmation is off, this instantly logs them in,
+      // triggering App.jsx to fire the 'SIGNED_IN' event and process the invite.
+      const { error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.fullName
+          }
+        }
+      });
+
+      if (error) throw error;
+      
+      // Show a temporary success state while App.jsx takes over the routing
+      setIsSubmitted(true); 
+      
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to create account');
+      setError(err.message || 'Failed to create account');
       setLoading(false);
     }
   };
 
+  // ARCHITECT FIX: Replaced "Check your email" with a seamless transition state
   if (isSubmitted) {
     return (
-      <div className="min-h-screen bg-navy flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-10 text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-            <CheckCircle className="text-green-600" size={32} />
+      <div className="min-h-screen bg-[#0A0F1E] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-10 text-center animate-in zoom-in-95 duration-300">
+          <div className="w-16 h-16 bg-[#00C896]/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00C896]"></div>
           </div>
-          <h1 className="text-2xl font-black text-navy mb-2">Check your email</h1>
-          <p className="text-gray-500 mb-8 font-medium">
-            We sent a verification link to <br/><span className="font-bold text-navy">{formData.email}</span>. 
-            <br/><br/>Please verify your email address to activate your account.
+          <h1 className="text-2xl font-black text-navy mb-2">Authentication Successful</h1>
+          <p className="text-gray-500 font-medium">
+            {inviteToken ? 'Processing your invitation and securing access...' : 'Provisioning your workspace...'}
           </p>
-          <Link to="/login" className="inline-flex items-center justify-center gap-2 bg-navy text-white px-6 py-3.5 rounded-xl font-bold hover:shadow-lg hover:shadow-navy/20 transition-all w-full active:scale-95">
-            Back to Login
-          </Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-navy flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-[#0A0F1E] flex flex-col items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-10">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-accent/20 text-accent rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+          <div className="w-16 h-16 bg-[#00C896]/20 text-[#00C896] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
             <Building2 size={32} />
           </div>
           <h1 className="text-3xl font-black text-navy mb-2">
@@ -118,7 +130,6 @@ export default function Signup() {
             )}
           </button>
 
-          {/* FIX: Raw GitHub SVG instead of Lucide component */}
           <button
             onClick={() => handleOAuthSignup('github')}
             disabled={oauthLoading || loading}
@@ -153,7 +164,7 @@ export default function Signup() {
               <input 
                 type="text" 
                 required 
-                className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-accent outline-none font-medium transition-all text-sm" 
+                className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#00C896] outline-none font-medium transition-all text-sm" 
                 value={formData.fullName} 
                 onChange={(e) => setFormData({...formData, fullName: e.target.value})} 
                 placeholder="Jane Doe"
@@ -167,7 +178,7 @@ export default function Signup() {
               <input 
                 type="email" 
                 required 
-                className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-accent outline-none font-medium transition-all text-sm" 
+                className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#00C896] outline-none font-medium transition-all text-sm" 
                 value={formData.email} 
                 onChange={(e) => setFormData({...formData, email: e.target.value})} 
                 placeholder="architect@agency.com"
@@ -181,7 +192,7 @@ export default function Signup() {
               <input 
                 type="password" 
                 required 
-                className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-accent outline-none font-medium transition-all text-sm" 
+                className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#00C896] outline-none font-medium transition-all text-sm" 
                 value={formData.password} 
                 onChange={(e) => setFormData({...formData, password: e.target.value})} 
                 placeholder="••••••••"
@@ -192,15 +203,15 @@ export default function Signup() {
           <button 
             disabled={loading || oauthLoading} 
             type="submit" 
-            className="w-full flex items-center justify-center gap-2 bg-accent text-white py-3.5 rounded-xl font-bold hover:shadow-lg hover:shadow-accent/20 transition-all mt-2 disabled:opacity-70 active:scale-95"
+            className="w-full flex items-center justify-center gap-2 bg-navy text-white py-3.5 rounded-xl font-bold hover:bg-navy/90 hover:shadow-lg hover:shadow-navy/20 transition-all mt-2 disabled:opacity-70 active:scale-95"
           >
-            {loading ? 'Creating Account...' : (inviteToken ? 'Accept Invitation' : 'Create Account')} <ArrowRight size={18} />
+            {loading ? 'Processing...' : (inviteToken ? 'Accept Invitation' : 'Create Account')} <ArrowRight size={18} />
           </button>
         </form>
 
         <div className="mt-8 text-center text-sm text-gray-500 font-medium">
           Already have an account?{' '}
-          <Link to="/login" className="text-navy font-bold hover:underline transition-colors">
+          <Link to="/login" className="text-[#00C896] font-bold hover:underline transition-colors">
             Sign In
           </Link>
         </div>
