@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { CheckCircle2, AlertCircle, UploadCloud, X, Send, Lock } from 'lucide-react';
+import { CheckCircle2, AlertCircle, UploadCloud, X, Send, Lock, FileText } from 'lucide-react';
 import api from '../lib/api';
 import { supabase } from '../lib/supabase';
 
