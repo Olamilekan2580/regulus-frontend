@@ -1,56 +1,73 @@
 import axios from 'axios';
-import { supabase } from './supabase'; // Adjust this path if necessary
+import { supabase } from './supabase';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL, 
+  // ARCHITECT FIX 1: The Fail-Safe URL. 
+  // If Vercel drops your environment variable, it defaults to your live production server.
+  baseURL: import.meta.env.VITE_API_URL || 'https://regulus-backend.onrender.com/api',
+  headers: {
+    'Content-Type': 'application/json'
+  }
 });
 
+// ==========================================
+// THE REQUEST INTERCEPTOR (The Pipeline)
+// ==========================================
 api.interceptors.request.use(async (config) => {
-  // ENGINE 1: Interrogate Supabase for an active OAuth session
-  const { data: { session } } = await supabase.auth.getSession();
-  
-  // ENGINE 2: Check for custom backend JWT (Email/Password fallback)
-  const legacyToken = localStorage.getItem('token');
-  
-  // WORKSPACE CONTEXT
-  const orgId = localStorage.getItem('current_org_id');
-  
-  // ROUTING LOGIC: Attach the correct authorization header
-  if (session?.access_token) {
-    config.headers.Authorization = `Bearer ${session.access_token}`;
-  } else if (legacyToken) {
-    config.headers.Authorization = `Bearer ${legacyToken}`;
+  // ARCHITECT FIX 2: The try/catch block.
+  // This guarantees that if the token check fails, it cleanly breaks the deadlock.
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.warn('[Supabase Session Warning]:', error.message);
+    }
+    
+    const legacyToken = localStorage.getItem('token');
+    const orgId = localStorage.getItem('current_org_id');
+    
+    // ROUTING LOGIC: Attach the correct authorization header
+    if (session?.access_token) {
+      config.headers.Authorization = `Bearer ${session.access_token}`;
+    } else if (legacyToken) {
+      config.headers.Authorization = `Bearer ${legacyToken}`;
+    }
+    
+    // Attach workspace routing header if it exists
+    if (orgId && orgId !== 'undefined' && orgId !== 'null') {
+      config.headers['x-org-id'] = orgId; 
+    }
+    
+    // CRITICAL: Send the request on its way
+    return config;
+
+  } catch (err) {
+    console.error('[Axios Request Interceptor Crash]:', err);
+    // Rejecting the promise forces the React components to stop spinning and show an error
+    return Promise.reject(err);
   }
-  
-  // Attach workspace routing header if it exists
-  if (orgId) {
-    config.headers['x-org-id'] = orgId; 
-  }
-  
-  return config;
 });
 
+// ==========================================
+// THE RESPONSE INTERCEPTOR (The Tripwire)
+// ==========================================
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    // 402 Payment Required: Trigger your custom billing wall event
+    // 402 Payment Required: Trigger billing wall
     if (error.response && error.response.status === 402) {
       window.dispatchEvent(new Event('trigger-billing-wall'));
     }
     
-    // 401 Unauthorized: Nuke both engines to prevent ghost sessions
+    // ARCHITECT FIX 3: Removed the forceful window.location.href = '/login'.
+    // Your public pages (like /public/intake) will now load correctly even if the user isn't logged in.
     if (error.response && error.response.status === 401) {
-      // Wipe custom backend data
+      console.warn('[Network 401]: Unauthorized or Expired Session');
+      
+      // We only clear storage; we let the React Router handle the redirection securely.
       localStorage.removeItem('token');
       localStorage.removeItem('current_org_id');
-      
-      // Wipe Supabase session
       await supabase.auth.signOut();
-      
-      // Prevent redirect looping if already on the login page
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
     }
     
     return Promise.reject(error);
