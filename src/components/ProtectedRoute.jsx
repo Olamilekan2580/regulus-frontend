@@ -1,49 +1,60 @@
 import { useState, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowRight } from 'lucide-react';
 import api from '../lib/api';
 
 export default function ProtectedRoute({ children }) {
   const { user, loading: authLoading } = useAuth();
   const location = useLocation();
   const [workspaceStatus, setWorkspaceStatus] = useState(null); 
+  const [debugError, setDebugError] = useState(''); // NEW: Surface hidden errors
 
   useEffect(() => {
     let isMounted = true;
+    let timeoutId;
 
     const verifyAccess = async () => {
       if (!user) return;
 
-      // ARCHITECT FIX: The Fast-Bypass
-      // First check if App.jsx just injected an org_id from the invite system
+      // 1. THE FAST BYPASS: If App.jsx or JoinOrg.jsx saved the org, trust it instantly.
       const storedOrgId = localStorage.getItem('current_org_id');
-      
       if (storedOrgId && storedOrgId !== 'undefined' && storedOrgId !== 'null') {
-        // If they have a valid ID, immediately clear them to pass
         if (isMounted) setWorkspaceStatus('complete');
         return; 
       }
 
-      // If no local storage exists, fall back to asking the backend
+      // 2. THE DEADLOCK BREAKER: If the API hangs for 5 seconds, kill the spinner.
+      timeoutId = setTimeout(() => {
+        if (isMounted && !workspaceStatus) {
+          setDebugError('Network timeout: Your api.js interceptor is likely deadlocked. Click below to bypass.');
+          setWorkspaceStatus('error-override');
+        }
+      }, 5000);
+
       try {
         const res = await api.get('/orgs/me');
         if (!isMounted) return;
 
-        // Handle both object and array responses securely
         const orgData = Array.isArray(res.data) ? res.data[0] : res.data;
 
-        if (orgData?.id) {
-          localStorage.setItem('current_org_id', orgData.id);
+        if (orgData?.id || orgData?.org_id) {
+          const finalId = orgData.id || orgData.org_id;
+          localStorage.setItem('current_org_id', finalId);
           if (orgData.name) localStorage.setItem('current_org_name', orgData.name);
           
-          setWorkspaceStatus(orgData.onboarding_completed ? 'complete' : 'incomplete');
+          setWorkspaceStatus(orgData.onboarding_completed === false ? 'incomplete' : 'complete');
         } else {
           setWorkspaceStatus('no-org');
         }
       } catch (err) {
-        console.error('[Guard] Backend verification failed:', err);
-        if (isMounted) setWorkspaceStatus('no-org');
+        console.error('[Guard Error]:', err);
+        if (isMounted) {
+          setDebugError(err.message || 'API request failed');
+          setWorkspaceStatus('no-org');
+        }
+      } finally {
+        clearTimeout(timeoutId);
       }
     };
 
@@ -51,10 +62,13 @@ export default function ProtectedRoute({ children }) {
       verifyAccess();
     }
 
-    return () => { isMounted = false; };
-  }, [user, authLoading]);
+    return () => { 
+      isMounted = false; 
+      clearTimeout(timeoutId);
+    };
+  }, [user, authLoading, workspaceStatus]);
 
-  // 1. SYSTEM LOADING
+  // STATE 1: LOADING (Will automatically die after 5 seconds now)
   if (authLoading || (user && !workspaceStatus)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#0A0F1E]">
@@ -66,22 +80,41 @@ export default function ProtectedRoute({ children }) {
     );
   }
 
-  // 2. UNAUTHENTICATED: Kick to Login
+  // STATE 2: THE DEADLOCK OVERRIDE (If Axios hangs)
+  if (workspaceStatus === 'error-override') {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0A0F1E] p-4 text-center">
+        <AlertTriangle className="text-amber-500 mb-4" size={48} />
+        <h2 className="text-white font-black text-2xl mb-2">Gateway Deadlock Detected</h2>
+        <p className="text-red-400 font-mono text-sm mb-8 bg-red-400/10 p-4 rounded-lg border border-red-400/20 max-w-lg">
+          {debugError}
+        </p>
+        <button 
+          onClick={() => setWorkspaceStatus('complete')}
+          className="flex items-center gap-2 bg-[#00C896] text-navy px-6 py-3 rounded-xl font-bold hover:bg-[#00C896]/90 transition-all"
+        >
+          Force Enter Dashboard <ArrowRight size={18} />
+        </button>
+      </div>
+    );
+  }
+
+  // STATE 3: UNAUTHENTICATED
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // 3. NO WORKSPACE / INCOMPLETE: Kick to Setup
+  // STATE 4: NO WORKSPACE / INCOMPLETE
   const isAtSetup = location.pathname === '/setup-workspace';
   if ((workspaceStatus === 'no-org' || workspaceStatus === 'incomplete') && !isAtSetup) {
     return <Navigate to="/setup-workspace" replace />;
   }
 
-  // 4. COMPLETE WORKSPACE: Prevent back-tracking to Setup
+  // STATE 5: PREVENT BACK-TRACKING
   if (workspaceStatus === 'complete' && isAtSetup) {
     return <Navigate to="/" replace />;
   }
 
-  // 5. CLEAR TO PASS
+  // STATE 6: CLEAR TO PASS
   return children;
 }
