@@ -46,18 +46,30 @@ export default function App() {
       if (event === 'SIGNED_IN' && session) {
         
         // --- CHECK FOR PENDING INVITES FIRST ---
-        const pendingToken = sessionStorage.getItem('pending_invite_token');
+        // 1. Upgraded to localStorage to survive OAuth redirects
+        const pendingToken = localStorage.getItem('pending_invite_token');
+        
         if (pendingToken) {
           try {
             console.log('[System] Processing pending invite...');
-            const res = await api.post('/orgs/accept-invite', { token: pendingToken });
-            sessionStorage.removeItem('pending_invite_token'); // Clear memory
+            
+            // 2. THE RACE CONDITION FIX: Explicitly inject the brand new JWT 
+            // so the backend doesn't reject this as an unauthorized request.
+            const res = await api.post(
+              '/orgs/accept-invite', 
+              { token: pendingToken },
+              { headers: { Authorization: `Bearer ${session.access_token}` } }
+            );
+            
+            localStorage.removeItem('pending_invite_token'); // Clear memory
             localStorage.setItem('current_org_id', res.data.org_id);
-            window.location.href = '/'; // Reload into new workspace
+            window.location.href = '/'; // Reload into the Inviter's workspace
             return; // EXIT EARLY
           } catch (err) {
-            console.error('Failed to process pending invite:', err);
-            sessionStorage.removeItem('pending_invite_token');
+            console.error('[Fatal Invite Error]:', err.response?.data || err);
+            localStorage.removeItem('pending_invite_token');
+            alert('Your invite failed to process. Please ask your admin for a new link.');
+            // We do NOT return here, so if it fails, it falls back to normal routing
           }
         }
         // ----------------------------------------

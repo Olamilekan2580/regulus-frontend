@@ -27,7 +27,7 @@ export default function JoinOrg() {
 
         if (!session) {
           // 3. Unauthenticated: Save token and force them to sign up
-          sessionStorage.setItem('pending_invite_token', token);
+          localStorage.setItem('pending_invite_token', token);
           navigate('/signup?mode=invite');
           return;
         }
