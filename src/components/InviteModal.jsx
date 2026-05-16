@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Copy, CheckCircle2, X } from 'lucide-react';
+import { Copy, CheckCircle2, X, AlertCircle } from 'lucide-react';
 import api from '../lib/api';
 
 export default function InviteModal({ orgId, onClose }) {
@@ -8,24 +8,29 @@ export default function InviteModal({ orgId, onClose }) {
   const [isSending, setIsSending] = useState(false);
   const [generatedLink, setGeneratedLink] = useState('');
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState(''); // UPGRADE: Inline error state
 
-  const handleInvite = async () => {
-    if (!email) return alert('Please enter an email address.');
+  const handleInvite = async (e) => {
+    e.preventDefault(); // UPGRADE: Prevents page reload on Enter key
+    setError('');
+
+    // UPGRADE: Strict email validation before hitting the server
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
     setIsSending(true);
 
     try {
-      // 1. Hit the backend and capture the response
       const res = await api.post(`/orgs/${orgId}/invite`, { email, role });
-      
-      // 2. Construct the absolute URL dynamically based on where the app is hosted
       const inviteUrl = `${window.location.origin}/join?token=${res.data.token}`;
       
-      // 3. Update the UI state to show the link
       setGeneratedLink(inviteUrl);
       setEmail('');
-      
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to generate invite.');
+      setError(err.response?.data?.error || 'Failed to generate invite link.');
     } finally {
       setIsSending(false);
     }
@@ -37,18 +42,17 @@ export default function InviteModal({ orgId, onClose }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      alert('Failed to copy. Please copy the text manually.');
+      setError('Failed to copy to clipboard.');
     }
   };
 
   return (
-    <div className="p-8 bg-white rounded-2xl shadow-2xl border border-gray-100 relative">
-      {/* NEW: Close Button for the Modal */}
+    <div className="p-8 bg-white rounded-2xl shadow-2xl border border-gray-100 relative max-w-md w-full">
       <button 
         onClick={onClose} 
-        className="absolute top-4 right-4 text-gray-400 hover:text-navy transition-colors"
+        className="absolute top-4 right-4 text-gray-400 hover:text-navy transition-colors bg-gray-50 hover:bg-gray-100 p-1.5 rounded-full"
       >
-        <X size={20} />
+        <X size={18} />
       </button>
 
       <h3 className="text-xl font-black text-navy mb-2">Invite Collaborator</h3>
@@ -57,22 +61,37 @@ export default function InviteModal({ orgId, onClose }) {
         <>
           <p className="text-sm text-gray-500 mb-6 font-medium">Generate a secure access token for a new team member.</p>
           
-          <div className="space-y-4">
+          {/* UPGRADE: Inline Error Rendering */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl flex items-center gap-2 text-red-600 text-sm font-bold">
+              <AlertCircle size={16} />
+              {error}
+            </div>
+          )}
+          
+          {/* UPGRADE: Wrapped in a form so the "Enter" key works */}
+          <form onSubmit={handleInvite} className="space-y-4">
             <div>
               <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Email Address</label>
               <input 
                 type="email" 
+                required
+                disabled={isSending}
                 placeholder="colleague@agency.com"
-                className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:border-accent transition-colors font-medium text-sm"
+                className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:border-[#00C896] transition-colors font-medium text-sm disabled:opacity-50"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (error) setError(''); // Clear error when typing
+                }}
               />
             </div>
             
             <div>
               <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Workspace Role</label>
               <select 
-                className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:border-accent transition-colors font-bold text-sm text-navy appearance-none cursor-pointer"
+                disabled={isSending}
+                className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:border-[#00C896] transition-colors font-bold text-sm text-navy appearance-none cursor-pointer disabled:opacity-50"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
               >
@@ -82,16 +101,19 @@ export default function InviteModal({ orgId, onClose }) {
             </div>
             
             <button 
-              onClick={handleInvite}
+              type="submit"
               disabled={isSending}
-              className="w-full py-3 mt-4 bg-navy text-white rounded-xl font-bold hover:shadow-lg hover:shadow-navy/20 transition-all active:scale-95 disabled:opacity-50"
+              className="w-full py-3 mt-4 bg-navy text-white rounded-xl font-bold hover:bg-navy/90 hover:shadow-lg hover:shadow-navy/20 transition-all active:scale-95 disabled:opacity-70 flex justify-center items-center h-12"
             >
-              {isSending ? 'Generating...' : 'Generate Invite Link'}
+              {isSending ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/20 border-t-white"></div>
+              ) : (
+                'Generate Invite Link'
+              )}
             </button>
-          </div>
+          </form>
         </>
       ) : (
-        // SUCCESS STATE UI
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 pt-2">
           <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
             <CheckCircle2 size={24} />
@@ -103,7 +125,7 @@ export default function InviteModal({ orgId, onClose }) {
               type="text" 
               readOnly 
               value={generatedLink} 
-              className="w-full bg-transparent outline-none text-xs text-gray-500 px-2 font-mono"
+              className="w-full bg-transparent outline-none text-xs text-gray-500 px-2 font-mono selection:bg-[#00C896]/20"
             />
             <button 
               onClick={copyToClipboard}
@@ -115,12 +137,14 @@ export default function InviteModal({ orgId, onClose }) {
 
           <div className="flex gap-2 mt-6">
             <button 
-              onClick={() => setGeneratedLink('')}
+              onClick={() => {
+                setGeneratedLink('');
+                setError('');
+              }}
               className="flex-1 py-3 text-sm text-gray-500 font-bold bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
             >
               New Invite
             </button>
-            {/* NEW: Done button to cleanly exit */}
             <button 
               onClick={onClose}
               className="flex-1 py-3 text-sm text-white font-bold bg-navy rounded-xl hover:bg-navy/90 transition-colors"

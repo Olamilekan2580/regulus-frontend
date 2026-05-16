@@ -44,6 +44,24 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       
       if (event === 'SIGNED_IN' && session) {
+        
+        // --- CHECK FOR PENDING INVITES FIRST ---
+        const pendingToken = sessionStorage.getItem('pending_invite_token');
+        if (pendingToken) {
+          try {
+            console.log('[System] Processing pending invite...');
+            const res = await api.post('/orgs/accept-invite', { token: pendingToken });
+            sessionStorage.removeItem('pending_invite_token'); // Clear memory
+            localStorage.setItem('current_org_id', res.data.org_id);
+            window.location.href = '/'; // Reload into new workspace
+            return; // EXIT EARLY
+          } catch (err) {
+            console.error('Failed to process pending invite:', err);
+            sessionStorage.removeItem('pending_invite_token');
+          }
+        }
+        // ----------------------------------------
+
         const existingOrgId = localStorage.getItem('current_org_id');
         
         // If OAuth bypasses the manual login function, catch them here
@@ -58,10 +76,8 @@ export default function App() {
 
             if (profile?.org_id) {
               localStorage.setItem('current_org_id', profile.org_id);
-              // Force reload to mount the application with the new Tenant Context
               window.location.reload(); 
             } else {
-              // We must provision their workspace immediately.
               console.warn('[OAuth] New user detected. Provisioning workspace...');
               
               try {
@@ -74,7 +90,7 @@ export default function App() {
                 const newOrgId = initRes.data?.org_id || initRes.data?.id;
                 if (newOrgId) {
                   localStorage.setItem('current_org_id', newOrgId);
-                  window.location.reload(); // Hard reset to load the new workspace
+                  window.location.reload(); 
                 }
               } catch (initErr) {
                 console.error('[FATAL]: Failed to provision OAuth workspace', initErr);
@@ -167,6 +183,7 @@ export default function App() {
       {/* 🟢 PUBLIC ROUTES (No login required) */}
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
+      <Route path="/join" element={<JoinOrg />} />
       <Route path="/portal/:token" element={<ClientPortal />} />
       <Route path="/secret/:id" element={<SecretReveal />} />
       <Route path="/p/:id" element={<ProposalView />} />
@@ -174,8 +191,6 @@ export default function App() {
       <Route path="/terms" element={<Terms />} />
       <Route path="/policies" element={<Policies />} />
 
-      {/* NOTE: /pay/success must come before /pay/:id so the static
-          segment is matched first and not swallowed by the dynamic one */}
       <Route path="/pay/success" element={<PaymentSuccess />} />
       <Route path="/pay/:id" element={<PublicCheckout />} />
 
@@ -211,11 +226,9 @@ export default function App() {
         <Route path="projects" element={<Projects />} />
         <Route path="invoices" element={<Invoices />} />
         <Route path="proposals" element={<Proposals />} />
-        {/* PATCH: Removed the protected proposals/:id route here so it defaults to the public /p/:id route */}
         <Route path="infrastructure" element={<Infrastructure />} />
         <Route path="profile" element={<Profile />} />
         <Route path="settings" element={<Settings />} />
-        <Route path="join" element={<JoinOrg />} />
         <Route path="sandbox" element={<ContractSandbox />} />
         <Route path="vault" element={<Vault />} />
         <Route path="blueprints" element={<AutomationHub />} />
