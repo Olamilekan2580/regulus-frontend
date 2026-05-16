@@ -76,7 +76,7 @@ export default function Proposals() {
     
     try {
       const payload = new FormData();
-      payload.append('org_id', orgId); // <-- THE CRITICAL FIX
+      payload.append('org_id', orgId); 
       payload.append('client_id', formData.client_id);
       payload.append('project_id', formData.project_id || '');
       payload.append('title', formData.title);
@@ -143,7 +143,6 @@ export default function Proposals() {
 
   return (
     <div className="space-y-8">
-      {/* 🔒 FIX: Mobile-Responsive Header */}
       <div className="flex flex-row items-start justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-navy tracking-tight">Proposals</h1>
@@ -229,7 +228,8 @@ export default function Proposals() {
                       {copiedId === proposal.id ? <Check size={16} className="text-green-500" /> : <LinkIcon size={16} />}
                     </button>
                     <button 
-                      onClick={() => navigate(`/proposals/${proposal.id}`)}
+                      // PATCH: Updated to navigate to the public /p/:id route instead of the protected one
+                      onClick={() => navigate(`/p/${proposal.id}`)}
                       className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
                     >
                       <Send size={14} /> View

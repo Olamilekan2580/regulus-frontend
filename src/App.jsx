@@ -38,7 +38,7 @@ export default function App() {
   const navigate = useNavigate();
 
   // ==========================================
-  // 1. GLOBAL OAUTH LISTENER (THE FIX)
+  // 1. GLOBAL OAUTH LISTENER
   // ==========================================
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -61,7 +61,6 @@ export default function App() {
               // Force reload to mount the application with the new Tenant Context
               window.location.reload(); 
             } else {
-              // ⚠️ THE FIX: If the user doesn't exist, they are a NEW OAuth signup.
               // We must provision their workspace immediately.
               console.warn('[OAuth] New user detected. Provisioning workspace...');
               
@@ -212,7 +211,7 @@ export default function App() {
         <Route path="projects" element={<Projects />} />
         <Route path="invoices" element={<Invoices />} />
         <Route path="proposals" element={<Proposals />} />
-        <Route path="proposals/:id" element={<ProposalView />} />
+        {/* PATCH: Removed the protected proposals/:id route here so it defaults to the public /p/:id route */}
         <Route path="infrastructure" element={<Infrastructure />} />
         <Route path="profile" element={<Profile />} />
         <Route path="settings" element={<Settings />} />
