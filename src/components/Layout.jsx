@@ -138,7 +138,7 @@ export default function Layout() {
   };
 
   const navItems = [
-    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Clients', path: '/clients', icon: Users },
     { name: 'Projects', path: '/projects', icon: FolderKanban },
     { name: 'Invoices', path: '/invoices', icon: Receipt },

@@ -29,8 +29,11 @@ import ProposalView from './pages/ProposalView';
 import InvoiceView from './pages/InvoiceView';
 import PublicCheckout from './pages/PublicCheckout';
 import PaymentSuccess from './pages/PaymentSuccess';
-import Policies from './pages/Policies';
-import Terms from './pages/Terms';
+
+// ARCHITECT FIX: Only import the new compliance pages. Delete the old Terms/Policies if they are obsolete.
+import PublicLanding from './pages/PublicLanding';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
 
 export default function App() {
   const [isRouting, setIsRouting] = useState(true);
@@ -46,40 +49,32 @@ export default function App() {
       if (event === 'SIGNED_IN' && session) {
         
         // --- CHECK FOR PENDING INVITES FIRST ---
-        // 1. Upgraded to localStorage to survive OAuth redirects
         const pendingToken = localStorage.getItem('pending_invite_token');
         
         if (pendingToken) {
           try {
             console.log('[System] Processing pending invite...');
-            
-            // 2. THE RACE CONDITION FIX: Explicitly inject the brand new JWT 
-            // so the backend doesn't reject this as an unauthorized request.
             const res = await api.post(
               '/orgs/accept-invite', 
               { token: pendingToken },
               { headers: { Authorization: `Bearer ${session.access_token}` } }
             );
             
-            localStorage.removeItem('pending_invite_token'); // Clear memory
+            localStorage.removeItem('pending_invite_token'); 
             localStorage.setItem('current_org_id', res.data.org_id);
-            window.location.href = '/'; // Reload into the Inviter's workspace
-            return; // EXIT EARLY
+            window.location.href = '/dashboard'; // ARCHITECT FIX: Redirect to the new dashboard route
+            return; 
           } catch (err) {
             console.error('[Fatal Invite Error]:', err.response?.data || err);
             localStorage.removeItem('pending_invite_token');
             alert('Your invite failed to process. Please ask your admin for a new link.');
-            // We do NOT return here, so if it fails, it falls back to normal routing
           }
         }
-        // ----------------------------------------
 
         const existingOrgId = localStorage.getItem('current_org_id');
         
-        // If OAuth bypasses the manual login function, catch them here
         if (!existingOrgId) {
           try {
-            // Fetch the user's profile which contains their org_id
             const { data: profile } = await supabase
               .from('profiles')
               .select('org_id')
@@ -88,7 +83,7 @@ export default function App() {
 
             if (profile?.org_id) {
               localStorage.setItem('current_org_id', profile.org_id);
-              window.location.reload(); 
+              window.location.href = '/dashboard'; // ARCHITECT FIX: Send them to the dashboard
             } else {
               console.warn('[OAuth] New user detected. Provisioning workspace...');
               
@@ -102,7 +97,7 @@ export default function App() {
                 const newOrgId = initRes.data?.org_id || initRes.data?.id;
                 if (newOrgId) {
                   localStorage.setItem('current_org_id', newOrgId);
-                  window.location.reload(); 
+                  window.location.href = '/dashboard'; 
                 }
               } catch (initErr) {
                 console.error('[FATAL]: Failed to provision OAuth workspace', initErr);
@@ -192,7 +187,12 @@ export default function App() {
 
   return (
     <Routes>
-      {/* 🟢 PUBLIC ROUTES (No login required) */}
+      {/* 🟢 PUBLIC COMPLIANCE ROUTES (Root level, no auth) */}
+      <Route path="/" element={<PublicLanding />} />
+      <Route path="/policies" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<TermsOfService />} />
+
+      {/* 🟢 OTHER PUBLIC ROUTES */}
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/join" element={<JoinOrg />} />
@@ -200,16 +200,12 @@ export default function App() {
       <Route path="/secret/:id" element={<SecretReveal />} />
       <Route path="/p/:id" element={<ProposalView />} />
       <Route path="/invoices/:id" element={<InvoiceView />} />
-      <Route path="/terms" element={<Terms />} />
-      <Route path="/policies" element={<Policies />} />
-
       <Route path="/pay/success" element={<PaymentSuccess />} />
       <Route path="/pay/:id" element={<PublicCheckout />} />
-
       <Route path="/public/intake/:token" element={<PublicIntake />} />
       <Route path="/public/updates/:token" element={<PublicTimeline />} />
 
-      {/* 🟡 SEMI-PROTECTED (No Sidebar/Layout) */}
+      {/* 🟡 SEMI-PROTECTED */}
       <Route
         path="/setup-workspace"
         element={
@@ -220,8 +216,8 @@ export default function App() {
       />
 
       {/* 🔴 FULLY PROTECTED (The Main App) */}
+      {/* ARCHITECT FIX: This is now a "Pathless Route". It wraps the components but doesn't claim a URL */}
       <Route
-        path="/"
         element={
           <ProtectedRoute>
             <div className="flex flex-col h-screen w-full overflow-hidden">
@@ -233,17 +229,18 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Dashboard />} />
-        <Route path="clients" element={<Clients />} />
-        <Route path="projects" element={<Projects />} />
-        <Route path="invoices" element={<Invoices />} />
-        <Route path="proposals" element={<Proposals />} />
-        <Route path="infrastructure" element={<Infrastructure />} />
-        <Route path="profile" element={<Profile />} />
-        <Route path="settings" element={<Settings />} />
-        <Route path="sandbox" element={<ContractSandbox />} />
-        <Route path="vault" element={<Vault />} />
-        <Route path="blueprints" element={<AutomationHub />} />
+        {/* ARCHITECT FIX: Dashboard now lives specifically at /dashboard */}
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/clients" element={<Clients />} />
+        <Route path="/projects" element={<Projects />} />
+        <Route path="/invoices" element={<Invoices />} />
+        <Route path="/proposals" element={<Proposals />} />
+        <Route path="/infrastructure" element={<Infrastructure />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/sandbox" element={<ContractSandbox />} />
+        <Route path="/vault" element={<Vault />} />
+        <Route path="/blueprints" element={<AutomationHub />} />
       </Route>
 
       {/* Global 404 */}
