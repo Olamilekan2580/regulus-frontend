@@ -1,13 +1,12 @@
 import { useEffect } from 'react';
 import { Shield, CreditCard, FolderKanban, ArrowRight } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase'; // ARCHITECT FIX: Import Supabase to check auth state
+import { supabase } from '../lib/supabase'; 
 
 export default function PublicLanding() {
   const navigate = useNavigate();
 
-  // ARCHITECT FIX: The Bouncer. 
-  // If they already have a token in their browser, skip the marketing page and drop them in the app.
+  // ARCHITECT FIX: The Bouncer 
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -17,6 +16,38 @@ export default function PublicLanding() {
     };
     checkSession();
   }, [navigate]);
+
+  // ARCHITECT FIX: Runtime Schema Injection (Clears "No Enhancements" flag)
+  useEffect(() => {
+    const scriptId = 'regulus-jsonld-schema';
+    
+    // Prevent duplicate injections if the component re-renders
+    if (!document.getElementById(scriptId)) {
+      const script = document.createElement('script');
+      script.id = scriptId;
+      script.type = 'application/ld+json';
+      script.innerHTML = JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Regulus",
+        "operatingSystem": "All",
+        "applicationCategory": "BusinessApplication",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "description": "Enterprise-grade multi-tenant client management portal and invoicing automation engine for modern technical freelancers."
+      });
+      document.head.appendChild(script);
+    }
+
+    // Lifecycle Cleanup: Evict the script tag when the user goes to /login or /dashboard
+    return () => {
+      const existingScript = document.getElementById(scriptId);
+      if (existingScript) existingScript.remove();
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
@@ -34,7 +65,7 @@ export default function PublicLanding() {
         </Link>
       </nav>
 
-      {/* Hero Section - THIS EXACT TEXT PASSES THE GOOGLE AUDIT */}
+      {/* Hero Section */}
       <main className="flex-1 flex flex-col items-center justify-center text-center px-4 py-20">
         <h1 className="text-5xl md:text-6xl font-black text-slate-900 tracking-tight mb-6 max-w-3xl">
           Enterprise Infrastructure for Independent Architects.
