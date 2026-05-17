@@ -1,7 +1,23 @@
+import { useEffect } from 'react';
 import { Shield, CreditCard, FolderKanban, ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase'; // ARCHITECT FIX: Import Supabase to check auth state
 
 export default function PublicLanding() {
+  const navigate = useNavigate();
+
+  // ARCHITECT FIX: The Bouncer. 
+  // If they already have a token in their browser, skip the marketing page and drop them in the app.
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate('/dashboard');
+      }
+    };
+    checkSession();
+  }, [navigate]);
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       {/* Navigation */}

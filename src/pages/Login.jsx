@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, ArrowRight, Building2 } from 'lucide-react'; // REMOVED Github
+import { Mail, Lock, ArrowRight, Building2 } from 'lucide-react';
 import api from '../lib/api';
 import { supabase } from '../lib/supabase'; 
 
@@ -20,7 +20,8 @@ export default function Login() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider,
         options: {
-          redirectTo: `${window.location.origin}/`
+          // ARCHITECT FIX 1: Point Supabase directly to the dashboard, not the landing page
+          redirectTo: `${window.location.origin}/dashboard`
         }
       });
       if (error) throw error;
@@ -62,7 +63,8 @@ export default function Login() {
         return;
       }
 
-      window.location.href = '/'; 
+      // ARCHITECT FIX 2: Route manual email logins to the dashboard
+      window.location.href = '/dashboard'; 
       
     } catch (err) {
       setError(err.response?.data?.error || 'Invalid credentials');
@@ -107,7 +109,6 @@ export default function Login() {
             )}
           </button>
 
-          {/* FIX: Raw GitHub SVG instead of Lucide component */}
           <button
             onClick={() => handleOAuthLogin('github')}
             disabled={oauthLoading || loading}

@@ -33,7 +33,8 @@ export default function Signup() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider,
         options: {
-          redirectTo: `${window.location.origin}/`
+          // ARCHITECT FIX: Point Supabase directly to the dashboard, not the landing page
+          redirectTo: `${window.location.origin}/dashboard`
         }
       });
       if (error) throw error;
@@ -49,7 +50,7 @@ export default function Signup() {
     setLoading(true);
     
     try {
-      // ARCHITECT FIX: Native Supabase signup. 
+      // Native Supabase signup. 
       // Because email confirmation is off, this instantly logs them in,
       // triggering App.jsx to fire the 'SIGNED_IN' event and process the invite.
       const { error } = await supabase.auth.signUp({
@@ -65,6 +66,7 @@ export default function Signup() {
       if (error) throw error;
       
       // Show a temporary success state while App.jsx takes over the routing
+      // App.jsx will catch the new session and redirect to /dashboard
       setIsSubmitted(true); 
       
     } catch (err) {
@@ -73,7 +75,6 @@ export default function Signup() {
     }
   };
 
-  // ARCHITECT FIX: Replaced "Check your email" with a seamless transition state
   if (isSubmitted) {
     return (
       <div className="min-h-screen bg-[#0A0F1E] flex items-center justify-center p-4">
