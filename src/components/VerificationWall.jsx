@@ -22,7 +22,11 @@ export default function VerificationWall({ isVerified, email }) {
 
     try {
       await api.post('/verification/confirm', { code });
-      window.location.reload(); // Hard reload to fetch new verified profile state
+      
+      // ARCHITECT FIX 1: Cache Buster
+      // Forces the browser to discard the old unverified profile and fetch a fresh one
+      window.location.href = window.location.pathname + '?refresh=' + Date.now();
+      
     } catch (err) {
       setError(err.response?.data?.error || 'Invalid code.');
       setLoading(false);
@@ -61,7 +65,8 @@ export default function VerificationWall({ isVerified, email }) {
 
         <div className="mt-6 text-center">
           <button 
-            onClick={() => api.post('/api/verification/send')}
+            // ARCHITECT FIX 2: Removed the rogue '/api' prefix to prevent a 404/500 error on resend
+            onClick={() => api.post('/verification/send')}
             className="text-sm text-slate-400 hover:text-white transition-colors"
           >
             Didn't receive the code? Resend
