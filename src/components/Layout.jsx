@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import BillingWall from './BillingWall'; 
+import VerificationWall from './VerificationWall'; // ARCHITECT FIX: Import the Iron Curtain
 
 // ==========================================
 // ENTERPRISE LAYER 1: ROUTE ERROR BOUNDARY
@@ -69,13 +70,14 @@ export default function Layout() {
   const [isLocked, setIsLocked] = useState(false); 
   const [orgData, setOrgData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // ARCHITECT FIX: State to hold user profile for verification check
+  const [userProfile, setUserProfile] = useState(null); 
 
   // ==========================================
   // ENTERPRISE LAYER 3: ROUTE TELEMETRY
   // ==========================================
   useEffect(() => {
-    // Silently log page views to your analytics engine
-    // Example: PostHog.capture('$pageview', { $current_url: location.pathname });
     console.log(`[Telemetry]: Navigated to ${location.pathname}`);
   }, [location.pathname]);
 
@@ -83,6 +85,19 @@ export default function Layout() {
     const handleLock = () => setIsLocked(true);
     window.addEventListener('trigger-billing-wall', handleLock);
     return () => window.removeEventListener('trigger-billing-wall', handleLock);
+  }, []);
+
+  // ARCHITECT FIX: Fetch User Profile Once on Mount for the Iron Curtain
+  useEffect(() => {
+    const fetchSecurityProfile = async () => {
+      try {
+        const res = await api.get('/users/me'); 
+        setUserProfile(res.data);
+      } catch (err) {
+        console.error('[Security Gate Error]: Failed to load user profile.', err.message);
+      }
+    };
+    fetchSecurityProfile();
   }, []);
 
   useEffect(() => {
@@ -190,10 +205,25 @@ export default function Layout() {
     </div>
   );
 
+  // ARCHITECT FIX: Determine if the UI needs to be locked and blurred
+  const isVerificationLocked = userProfile && !userProfile.is_verified;
+  const isScreenLocked = isLocked || isVerificationLocked;
+
   return (
     <>
+      {/* SECURITY GATES (Highest Z-Index) */}
       {isLocked && <BillingWall />}
-      <div className={`flex h-screen bg-gray-50 overflow-hidden ${isLocked ? 'blur-md pointer-events-none select-none' : ''}`}>
+      
+      {/* THE IRON CURTAIN */}
+      {userProfile && (
+        <VerificationWall 
+          isVerified={userProfile.is_verified} 
+          email={userProfile.email} 
+        />
+      )}
+
+      {/* MAIN APPLICATION SHELL */}
+      <div className={`flex h-screen bg-gray-50 overflow-hidden ${isScreenLocked ? 'blur-md pointer-events-none select-none' : ''}`}>
         
         {/* DESKTOP SIDEBAR */}
         <aside className="hidden md:flex w-56 bg-navy text-gray-300 flex-col border-r border-gray-800 shadow-xl z-20 shrink-0">
