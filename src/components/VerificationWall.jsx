@@ -9,7 +9,7 @@ export default function VerificationWall({ isVerified, email }) {
   // Auto-trigger the email the second they hit the wall
   useEffect(() => {
     if (!isVerified) {
-      api.post('/api/verification/send').catch(err => console.error(err));
+      api.post('/verification/send').catch(err => console.error(err));
     }
   }, [isVerified]);
 
@@ -21,7 +21,7 @@ export default function VerificationWall({ isVerified, email }) {
     setError('');
 
     try {
-      await api.post('/api/verification/confirm', { code });
+      await api.post('/verification/confirm', { code });
       window.location.reload(); // Hard reload to fetch new verified profile state
     } catch (err) {
       setError(err.response?.data?.error || 'Invalid code.');
