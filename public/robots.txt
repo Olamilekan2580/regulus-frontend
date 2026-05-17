@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Allow: /policies
+Allow: /terms
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /app/
+Disallow: /login
+
+Sitemap: https://www.regulus.com.ng/sitemap.xml
