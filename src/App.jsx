@@ -128,9 +128,11 @@ export default function App() {
       if (
         hostname === 'localhost' ||
         hostname === '127.0.0.1' ||
-        hostname.includes('vercel.app')
+        hostname.includes('vercel.app') ||
+        hostname === 'regulus.com.ng' ||          // ARCHITECT FIX: Whitelist Root
+        hostname === 'www.regulus.com.ng'       // ARCHITECT FIX: Whitelist WWW
       ) {
-        setIsRouting(false);
+        setIsRouting(false); // Instantly drop the spinner and render the page
         return;
       }
 
