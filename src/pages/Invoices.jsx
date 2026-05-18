@@ -86,15 +86,6 @@ export default function Invoices() {
     return formData.line_items.reduce((sum, item) => sum + (parseFloat(item.quantity) * parseFloat(item.rate || 0)), 0);
   };
 
-  const getClientDetails = (clientId) => {
-    const foundClient = clients.find(c => c.id === clientId);
-    if (!foundClient) return { name: 'Unknown Client', email: 'No email provided' };
-    return {
-      name: foundClient.company || foundClient.name || 'Unknown Client',
-      email: foundClient.email || 'No email provided'
-    };
-  };
-
   const handleCopyLink = (id) => {
     const publicUrl = `${window.location.origin}/pay/${id}`; 
     navigator.clipboard.writeText(publicUrl);
@@ -108,7 +99,7 @@ export default function Invoices() {
       fetchData(); 
     } catch (err) {
       console.error('Failed to update status', err);
-      alert('Failed to update invoice status.');
+      alert('Failed to update invoice status. Check backend logs for SQL constraints.');
     }
   };
 
@@ -116,7 +107,6 @@ export default function Invoices() {
     e.preventDefault();
     const orgId = localStorage.getItem('current_org_id');
     
-    // HARDENED LOCK: Blocks actual nulls AND stringified nulls/undefined
     if (!orgId || orgId === 'undefined' || orgId === 'null') {
       setError('Workspace context missing. Please log out and log back in.');
       return;
@@ -128,7 +118,7 @@ export default function Invoices() {
     try {
       const sanitizedPayload = {
         ...formData,
-        org_id: orgId, // <-- THE CRITICAL FIX
+        org_id: orgId, 
         project_id: formData.project_id || null, 
         total: calculateTotal(),
         line_items: formData.line_items.map(item => ({
@@ -163,8 +153,10 @@ export default function Invoices() {
     setDownloadingId(invoice.id);
     try {
       const response = await api.get(`/invoices/${invoice.id}/pdf`, { responseType: 'blob' });
-      const clientData = getClientDetails(invoice.client_id);
-      const safeClientName = clientData.name.replace(/\s+/g, '_');
+      
+      // ARCHITECT FIX: Direct nested extraction for PDF naming
+      const clientName = invoice.clients?.company || invoice.clients?.name || 'Unknown_Client';
+      const safeClientName = clientName.replace(/\s+/g, '_');
       const filename = `${invoice.invoice_number}_${safeClientName}.pdf`;
 
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
@@ -187,13 +179,12 @@ export default function Invoices() {
   const statusColors = {
     'Draft': 'bg-gray-100 text-gray-700 border-gray-200',
     'Sent': 'bg-blue-50 text-blue-700 border-blue-200',
-    'Paid': 'bg-accent/10 text-accent border-accent/20',
+    'Paid': 'bg-emerald-50 text-emerald-700 border-emerald-200', // Adjusted Paid color for better contrast
     'Overdue': 'bg-red-50 text-red-700 border-red-200'
   };
 
   return (
     <div className="space-y-6">
-      {/* 🔒 FIX: Mobile-Responsive Header */}
       <div className="flex flex-row items-start justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-navy tracking-tight">Invoices</h1>
@@ -224,8 +215,10 @@ export default function Invoices() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {invoices.map(invoice => {
-            const client = getClientDetails(invoice.client_id);
+            // ARCHITECT FIX: Pluck the name directly from the joined database object
+            const clientName = invoice.clients?.company || invoice.clients?.name || 'Unknown Client';
             const symbol = currencySymbols[invoice.currency] || '$';
+            
             return (
               <div key={invoice.id} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex flex-col h-full hover:border-accent/30 transition-colors group">
                 <div className="flex justify-between items-start mb-4">
@@ -233,8 +226,8 @@ export default function Invoices() {
                     <h3 className="font-bold text-lg text-navy group-hover:text-accent transition-colors">
                       {invoice.invoice_number || `INV-${invoice.id.substring(0,4).toUpperCase()}`}
                     </h3>
-                    <p className="text-sm text-gray-500 font-medium">
-                      {client.name}
+                    <p className="text-sm text-gray-500 font-medium truncate max-w-[150px]">
+                      {clientName}
                     </p>
                   </div>
                   
@@ -300,7 +293,6 @@ export default function Invoices() {
       
       {isModalOpen && (
         <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
-          {/* 🔒 FIX: Modal container height constraint and flex-col */}
           <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 relative overflow-hidden">
             
             <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50 shrink-0">
