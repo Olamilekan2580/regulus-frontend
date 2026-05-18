@@ -232,10 +232,11 @@ export default function Invoices() {
                   </div>
                   
                   <select 
-                    value={invoice.status}
-                    onChange={(e) => handleStatusChange(invoice.id, e.target.value)}
-                    className={`text-xs px-3 py-1.5 rounded-full font-bold border transition-all cursor-pointer outline-none appearance-none ${statusColors[invoice.status] || statusColors['Draft']}`}
-                  >
+  value={invoice.status}
+  onChange={(e) => handleStatusChange(invoice.id, e.target.value)}
+  disabled={invoice.status === 'Paid'} // ARCHITECT FIX: UI Lock
+  className={`text-xs px-3 py-1.5... ${invoice.status === 'Paid' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+>
                     <option value="Draft">Draft</option>
                     <option value="Sent">Sent</option>
                     <option value="Paid">Paid</option>
