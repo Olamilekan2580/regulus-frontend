@@ -57,8 +57,17 @@ export default function Projects() {
     setError('');
     setIsSubmitting(true); 
 
+    // ARCHITECT FIX: Sanitize the payload exactly to the strict Zod API contract
+    const sanitizedPayload = {
+      client_id: formData.client_id,
+      name: formData.name,
+      description: formData.description || null,
+      status: formData.status || 'Planning',
+      deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null
+    };
+
     try {
-      await api.post('/projects', formData);
+      await api.post('/projects', sanitizedPayload);
       setIsModalOpen(false);
       setFormData({
         client_id: clients[0]?.id || '',
