@@ -52,12 +52,21 @@ export default function Projects() {
     fetchData();
   }, []);
 
+  // ARCHITECT FIX: Moved handleStatusChange outside so JSX can access it
+  const handleStatusChange = async (projectId, newStatus) => {
+    try {
+      await api.put(`/projects/${projectId}`, { status: newStatus });
+      fetchData(); 
+    } catch (err) {
+      console.error('Failed to update status:', err.response?.data?.error);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setIsSubmitting(true); 
 
-    // ARCHITECT FIX: Sanitize the payload exactly to the strict Zod API contract
     const sanitizedPayload = {
       client_id: formData.client_id,
       name: formData.name,
@@ -87,12 +96,14 @@ export default function Projects() {
   const statusStyles = {
     'Planning': 'bg-gray-100 text-gray-700 border-gray-200',
     'Active': 'bg-blue-50 text-blue-700 border-blue-200',
-    'Completed': 'bg-green-50 text-green-700 border-green-200'
+    'Completed': 'bg-green-50 text-green-700 border-green-200',
+    'Draft': 'bg-slate-100 text-slate-700 border-slate-200',
+    'On Hold': 'bg-orange-50 text-orange-700 border-orange-200',
+    'Archived': 'bg-red-50 text-red-700 border-red-200'
   };
 
   return (
     <div className="space-y-8">
-      {/* 🔒 FIX: Mobile-Responsive Header */}
       <div className="flex flex-row items-start justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-navy tracking-tight">Projects</h1>
@@ -108,7 +119,6 @@ export default function Projects() {
         </button>
       </div>
 
-      {/* Grid */}
       {loading ? (
         <div className="flex items-center justify-center p-12 text-gray-400">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-navy mr-3"></div>
@@ -141,10 +151,20 @@ export default function Projects() {
                 </button>
 
                 <div className="mb-4 pr-6">
+                  {/* ARCHITECT FIX: Replaced static span with interactive dropdown */}
                   <div className="flex items-center gap-2 mb-2">
-                    <span className={`text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full font-bold border ${statusStyles[project.status] || statusStyles['Planning']}`}>
-                      {project.status}
-                    </span>
+                    <select
+                      value={project.status}
+                      onChange={(e) => handleStatusChange(project.id, e.target.value)}
+                      className={`text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full font-bold border outline-none cursor-pointer appearance-none hover:opacity-80 transition-opacity ${statusStyles[project.status] || statusStyles['Planning']}`}
+                    >
+                      <option value="Draft">Draft</option>
+                      <option value="Planning">Planning</option>
+                      <option value="Active">Active</option>
+                      <option value="On Hold">On Hold</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Archived">Archived</option>
+                    </select>
                   </div>
                   <h3 className="font-bold text-xl text-navy leading-tight line-clamp-1">{project.name}</h3>
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider mt-2">
@@ -189,7 +209,6 @@ export default function Projects() {
         </div>
       )}
 
-      {/* Share Links Modal (Responsive Constraints Added) */}
       {shareProject && (
         <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
           <div className="bg-[#0A0F1E] rounded-2xl w-full max-w-xl shadow-2xl flex flex-col max-h-[90vh] scale-100 animate-in zoom-in-95 duration-200 overflow-hidden border border-slate-800 relative">
@@ -212,7 +231,6 @@ export default function Projects() {
         </div>
       )}
 
-      {/* Unified Project Hub Modal */}
       {updateProject && (
         <div className="fixed inset-0 bg-navy/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
           <div className="bg-gray-50 rounded-3xl w-full max-w-6xl shadow-2xl scale-100 animate-in zoom-in-95 duration-200 overflow-hidden relative max-h-[90vh] flex flex-col">
@@ -250,7 +268,6 @@ export default function Projects() {
         </div>
       )}
 
-      {/* 🔒 FIX: Premium Create Modal Constraints */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 relative overflow-hidden">
