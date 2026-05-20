@@ -2,9 +2,9 @@ import axios from 'axios';
 import { supabase } from './supabase';
 
 const api = axios.create({
-  // ARCHITECT FIX 1: The Fail-Safe URL. 
-  // If Vercel drops your environment variable, it defaults to your live production server.
-  baseURL: import.meta.env.VITE_API_URL || 'https://regulus-backend.onrender.com/api',
+  // ARCHITECT FIX: Hardcode the correct production domain with the /api prefix.
+  // If VITE_API_URL is missing, it will default to your AWS server.
+  baseURL: import.meta.env.VITE_API_URL || 'https://api.regulus.com.ng/api',
   headers: {
     'Content-Type': 'application/json'
   }
